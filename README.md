@@ -2,8 +2,10 @@
 
 App **100% Kotlin** (Android) que abre o Google, detecta quando o jogo **Archéo** (PrideBet MZ) é aberto e mostra:
 
+
 - 🔔 Toast **"jogo Lindo com sucesso ✅✅"** ao detectar o jogo;
-- 💰 **Saldo do jogo em tempo real** no canto superior da tela (HUD fixo).
+- 💰 **Saldo do jogo em tempo real** no canto superior da tela (HUD fixo);
+- ⚙️ **Janela flutuante** (botão G) com **stake**, **nº de cliques** e **operação automática**.
 
 O APK é compilado **automaticamente no GitHub Actions** a cada push — sem Android Studio, sem PC.
 
@@ -25,9 +27,55 @@ O APK é compilado **automaticamente no GitHub Actions** a cada push — sem And
 3. Assim que o jogo carregar: **toast** aparece e o HUD no topo começa a mostrar o **saldo real** do jogo;
 4. O botão amarelo **G** (canto inferior direito) volta para o Google.
 
+
+## ⚙️ Janela flutuante de configuração (v1.1)
+
+Toque no botão flutuante **G** → abre uma **janela flutuante** (arrastável pela barra de título,
+com botão **—** para minimizar e **✕** para fechar):
+
+| Controle | O que faz |
+|---|---|
+| **Stake / Aposta (FUN)** | `−` / `+` de 0,50 em 0,50 (1,00 a 100,00). Aplica no campo real do jogo. |
+| **Cliques por sessão** | de 1 a 10 casas por rodada. |
+| **▶ OPERAÇÃO AUTOMÁTICA** | liga/desliga o bot: ele clica **COMEÇAR**, escolhe as casas **aleatoriamente**, avança os níveis e faz **CASHOUT** no fim — repetindo até você parar. |
+| **Status** | sessões feitas, W/L e o stake/cliques em uso, em tempo real. |
+
+A janela mostra `W · L` no cabeçalho mesmo minimizada. O botão **Ir para o Google** fica dentro do painel.
+
+### Como o app manda comandos para dentro do iframe do jogo
+
+`evaluateJavascript` só alcança o **frame principal** — e o jogo vive num iframe de outra origem.
+A ponte é feita em duas direções:
+
+```text
+app → jogo :  evaluateJavascript no frame principal
+              → push(window) + push(iframe.contentWindow)  [postMessage '*']
+              → script injetado em cada frame faz RELAY até o iframe do provedor
+              → dedupe por id (o comando pode chegar 2x, executa 1x)
+
+jogo → app :  window.ArcheoBridge.postMessage(json)
+              → WebViewCompat.addWebMessageListener recebe de qualquer frame
+```
+
+### O motor automático (mesma lógica do laboratório)
+
+Portei a máquina de estados que usei no Playwright para JavaScript puro, rodando **dentro do
+frame do jogo**:
+
+1. `dismissOverlays()` — fecha o modal "Bem-vindo!"/backdrops se estiverem abertos;
+2. garante o stake (`input.stake-input` via setter nativo + eventos `input/change`);
+3. clica **COMEÇAR** e espera a linha ativa ficar clicável;
+4. para cada clique: sorteia 1 das 4 casas da linha ativa e dispara
+   `pointerdown → mousedown → pointerup → mouseup → click`;
+5. detecta o resultado: linha ativa avançou = **sobreviveu**; tabuleiro revelou = **caveira**;
+6. se sobreviveu a todos os cliques → **CASHOUT**; conta W/L e recomeça.
+
+> 🧪 Testado contra o jogo real: **34 sessões em 45 s** (16 W / 18 L), saldo atualizando na tela
+> e comando de parada atendido imediatamente.
+
 ---
 
-## ⚙️ Como o saldo é lido (a parte difícil)
+## 💰 Como o saldo é lido (a parte difícil)
 
 O Archéo não roda na página da PrideBet: ele vive num **iframe de outro domínio**
 (`splitthepot.games/pridebet-mz/stages/archeo`). Um `evaluateJavascript` normal só enxerga o

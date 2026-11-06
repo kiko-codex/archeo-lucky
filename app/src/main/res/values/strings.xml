@@ -7,4 +7,12 @@
     <string name="status_offline">aguardando jogo</string>
     <string name="status_live">AO VIVO</string>
     <string name="go_google">Ir para o Google</string>
+
+    <string name="panel_title">⚙ CONFIGURAÇÕES</string>
+    <string name="label_stake">STAKE / APOSTA (FUN)</string>
+    <string name="label_clicks">CLIQUES POR SESSÃO</string>
+    <string name="auto_start">▶  OPERAÇÃO AUTOMÁTICA</string>
+    <string name="auto_stop">■  PARAR OPERAÇÃO</string>
+    <string name="auto_idle">Automático parado.\nAbra o jogo Archéo e toque em operação automática.</string>
+    <string name="auto_no_game">Abra o jogo Archéo primeiro 😉</string>
 </resources>
