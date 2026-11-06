@@ -2,17 +2,19 @@
 <resources>
     <string name="app_name">Archeo Lucky</string>
     <string name="game_toast">jogo Lindo com sucesso ✅✅</string>
+    <string name="mines_toast">Mi Mines Carregado ✅✅✅</string>
     <string name="saldo_label">SALDO DO JOGO</string>
-    <string name="saldo_empty">— FUN</string>
+    <string name="saldo_empty">—</string>
     <string name="status_offline">aguardando jogo</string>
     <string name="status_live">AO VIVO</string>
     <string name="go_google">Ir para o Google</string>
 
     <string name="panel_title">⚙ CONFIGURAÇÕES</string>
-    <string name="label_stake">STAKE / APOSTA (FUN)</string>
+    <string name="label_stake">STAKE / APOSTA</string>
     <string name="label_clicks">CLIQUES POR SESSÃO</string>
+    <string name="label_mines">MINAS (MI MINES)</string>
     <string name="auto_start">▶  OPERAÇÃO AUTOMÁTICA</string>
     <string name="auto_stop">■  PARAR OPERAÇÃO</string>
-    <string name="auto_idle">Automático parado.\nAbra o jogo Archéo e toque em operação automática.</string>
-    <string name="auto_no_game">Abra o jogo Archéo primeiro 😉</string>
+    <string name="auto_idle">Automático parado.\nAbra o Archéo ou o Mi Mines e toque em operação automática.</string>
+    <string name="auto_no_game">Abra um jogo primeiro 😉</string>
 </resources>

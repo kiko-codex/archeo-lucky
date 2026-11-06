@@ -30,25 +30,21 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Archeo Lucky Browser  ·  v1.1
+ * Archeo Lucky Browser  ·  v1.2
  * =============================
  *  1. Abre o Google num WebView;
- *  2. Detecta o jogo ARCHÉO e mostra o toast "jogo Lindo com sucesso ✅✅";
- *  3. HUD com o SALDO do jogo em tempo real (canto superior);
- *  4. Botão flutuante "G" abre uma JANELA FLUTUANTE de configuração com:
- *       - Stake (aposta) ajustável;
- *       - Quantos cliques por sessão;
- *       - Operação AUTOMÁTICA (escolhe os blocos aleatoriamente e faz cashout),
- *         a mesma lógica de automação usada no laboratório (Playwright).
+ *  2. Detecta e anuncia os jogos:
+ *       · ARCHÉO      -> toast "jogo Lindo com sucesso ✅✅"
+ *       · MI MINES    -> toast "Mi Mines Carregado ✅✅✅"
+ *  3. HUD com o SALDO em tempo real (FUN no Archéo, MZN no Mi Mines);
+ *  4. Janela flutuante "G" com stake, nº de cliques, **nº de minas** e operação automática.
  *
- * Comunicação app <-> iframe cross-origin do jogo:
- *   - entrada  (app -> jogo): window.postMessage com relay entre frames,
- *     porque evaluateJavascript só alcança o frame principal;
- *   - saída    (jogo -> app): ArcheoBridge.postMessage + WebMessageListener.
+ * Engines automáticos (rodam DENTRO do frame do jogo):
+ *   · Archéo   (SplitThePot, Angular+SVG) -> button[tile] / COMEÇAR / CASHOUT
+ *   · Mi Mines (Spribe, canvas 5x5)       -> canvas hit-test por coordenada + BET / CASH OUT
  */
 class MainActivity : android.app.Activity() {
 
-    // ---------------------------------------------------------------- views
     private lateinit var root: View
     private lateinit var webView: WebView
     private lateinit var saldoValue: TextView
@@ -62,18 +58,19 @@ class MainActivity : android.app.Activity() {
     private lateinit var panelSummary: TextView
     private lateinit var stakeValue: TextView
     private lateinit var clicksValue: TextView
+    private lateinit var minesValue: TextView
     private lateinit var autoStatus: TextView
     private lateinit var btnAuto: TextView
 
-    // ---------------------------------------------------------------- estado
     private val ui = Handler(Looper.getMainLooper())
-    private var gameToastAlreadyShown = false
-    private var gameDetected = false
+    private var lastToastGame: String? = null
+    private var detectedGame: String? = null
     private var lastBalance: String? = null
     private var mainFrameFallbackRunning = false
 
     private var stake = 1.0
     private var clicksPerSession = 3
+    private var minesCount = 3
     private var autoRunning = false
     private var panelMinimized = false
 
@@ -96,6 +93,7 @@ class MainActivity : android.app.Activity() {
         panelSummary = findViewById(R.id.panelSummary)
         stakeValue = findViewById(R.id.stakeValue)
         clicksValue = findViewById(R.id.clicksValue)
+        minesValue = findViewById(R.id.minesValue)
         autoStatus = findViewById(R.id.autoStatus)
         btnAuto = findViewById(R.id.btnAuto)
 
@@ -107,6 +105,7 @@ class MainActivity : android.app.Activity() {
 
         refreshStakeLabel()
         refreshClicksLabel()
+        refreshMinesLabel()
 
         val deepLink = intent?.dataString
         webView.loadUrl(if (!deepLink.isNullOrBlank()) deepLink else startUrl)
@@ -145,16 +144,13 @@ class MainActivity : android.app.Activity() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                if (isArcheo(url)) {
-                    notifyGameOpened()
-                } else {
-                    gameToastAlreadyShown = false
-                }
+                val g = gameFromUrl(url)
+                if (g != null) notifyGameOpened(g) else lastToastGame = null
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                if (isArcheo(url)) notifyGameOpened()
+                gameFromUrl(url)?.let { notifyGameOpened(it) }
                 view?.evaluateJavascript(WATCHER_JS, null)
                 if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                     startMainFrameFallback()
@@ -168,30 +164,36 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun inspectUrl(url: String) {
-        if (isArcheo(url)) notifyGameOpened()
+        gameFromUrl(url)?.let { notifyGameOpened(it) }
     }
 
-    private fun isArcheo(url: String?): Boolean {
-        if (url.isNullOrBlank()) return false
+    private fun gameFromUrl(url: String?): String? {
+        if (url.isNullOrBlank()) return null
         val u = url.lowercase(Locale.ROOT)
-        if (!u.contains("archeo")) return false
-        return u.contains("pridebet") ||
-            u.contains("splitthepot") ||
-            u.contains("playdemo") ||
-            u.contains("/games/archeo")
+        return when {
+            u.contains("mines-6") -> GAME_MIMINES
+            u.contains("spribegaming") && u.contains("mines") -> GAME_MIMINES
+            u.contains("archeo") && (u.contains("pridebet") || u.contains("splitthepot") ||
+                u.contains("playdemo") || u.contains("/games/archeo")) -> GAME_ARCHEO
+            else -> null
+        }
     }
 
-    private fun notifyGameOpened() {
-        if (!gameDetected) {
-            gameDetected = true
-            autoStatus.text = getString(R.string.auto_idle)
+    private fun notifyGameOpened(game: String) {
+        val changed = detectedGame != game
+        detectedGame = game
+        if (changed) {
+            autoStatus.text = getString(
+                if (game == GAME_MIMINES) R.string.mines_toast else R.string.game_toast
+            )
         }
-        if (gameToastAlreadyShown) return
-        gameToastAlreadyShown = true
-        Toast.makeText(this, R.string.game_toast, Toast.LENGTH_LONG).show()
+        if (lastToastGame == game) return
+        lastToastGame = game
+        val res = if (game == GAME_MIMINES) R.string.mines_toast else R.string.game_toast
+        Toast.makeText(this, res, Toast.LENGTH_LONG).show()
         liveStatus.text = getString(R.string.status_live)
         liveStatus.setTextColor(getColor(R.color.green))
-        statusLine.text = "Archéo detectado · lendo saldo…"
+        statusLine.text = if (game == GAME_MIMINES) "Mi Mines · lendo saldo…" else "Archéo · lendo saldo…"
     }
 
     // ============================================== Ponte do saldo (real-time)
@@ -223,14 +225,20 @@ class MainActivity : android.app.Activity() {
             val json = JSONObject(raw)
             when (json.optString("type")) {
                 "hello" -> {
-                    if (isArcheo(json.optString("url"))) notifyGameOpened()
+                    val g = json.optString("game")
+                    if (g == GAME_MIMINES || g == GAME_ARCHEO) {
+                        notifyGameOpened(g)
+                        // o board acabou de ficar pronto: reenvia as configurações
+                        // (antes disso o frame do jogo ainda não existia e o comando era descartado)
+                        pushSettings()
+                    }
                 }
 
                 "saldo" -> {
                     val value = json.optString("value")
+                    val cur = json.optString("currency", "FUN")
                     if (value.isNotBlank()) {
-                        notifyGameOpened()
-                        updateBalance(value)
+                        updateBalance(value, cur)
                     }
                 }
 
@@ -242,20 +250,25 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun handleAutoReport(json: JSONObject) {
-        gameDetected = true
+        val g = json.optString("game")
+        if (g == GAME_MIMINES || g == GAME_ARCHEO) detectedGame = g
         autoRunning = json.optBoolean("running", autoRunning)
         val sessions = json.optInt("sessions", 0)
         val wins = json.optInt("wins", 0)
         val losses = json.optInt("losses", 0)
         val st = json.optDouble("stake", stake)
         val ck = json.optInt("clicks", clicksPerSession)
+        val mn = json.optInt("mines", minesCount)
+        val game = if (detectedGame == GAME_MIMINES) "Mi Mines" else "Archéo"
 
         panelSummary.text = "W$wins · L$losses"
         autoStatus.text = buildString {
             append(if (autoRunning) "● rodando" else "○ parado")
-            append("  ·  sessões: ").append(sessions)
-            append("\nW: ").append(wins).append("   L: ").append(losses)
-            append("\nstake ").append(money(st)).append(" FUN · ").append(ck).append(" cliques")
+            append("  ·  ").append(game)
+            append("\nsessões: ").append(sessions)
+            append("   W: ").append(wins).append("   L: ").append(losses)
+            append("\nstake ").append(money(st)).append(" · ").append(ck).append(" cliques")
+            if (detectedGame == GAME_MIMINES) append(" · ").append(mn).append(" minas")
         }
         applyAutoUi()
     }
@@ -267,14 +280,11 @@ class MainActivity : android.app.Activity() {
         val tick = object : Runnable {
             override fun run() {
                 webView.evaluateJavascript(
-                    "(function(){var m=(document.body&&document.body.innerText||'').match(/Saldo\\s*([0-9.]+,\\d{2})\\s*FUN/i);" +
-                        "return m?m[1]:'';})()"
+                    "(function(){var t=document.body?document.body.innerText:'';" +
+                        "var m=t.match(/Saldo\\s*([0-9.]+,\\d{2})\\s*FUN/i);return m?m[1]:'';})()"
                 ) { result ->
                     val v = result?.replace("\"", "")?.trim()
-                    if (!v.isNullOrBlank() && v != "null") {
-                        notifyGameOpened()
-                        updateBalance(v)
-                    }
+                    if (!v.isNullOrBlank() && v != "null") updateBalance(v, "FUN")
                 }
                 ui.postDelayed(this, 1000)
             }
@@ -282,10 +292,11 @@ class MainActivity : android.app.Activity() {
         ui.postDelayed(tick, 1000)
     }
 
-    private fun updateBalance(value: String) {
-        if (value == lastBalance) return
-        lastBalance = value
-        saldoValue.text = "$value FUN"
+    private fun updateBalance(value: String, currency: String) {
+        val key = "$value $currency"
+        if (key == lastBalance) return
+        lastBalance = key
+        saldoValue.text = "$value $currency"
         liveStatus.text = getString(R.string.status_live)
         liveStatus.setTextColor(getColor(R.color.green))
         val now = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
@@ -303,8 +314,8 @@ class MainActivity : android.app.Activity() {
 
     private fun resetHud() {
         lastBalance = null
-        gameToastAlreadyShown = false
-        gameDetected = false
+        lastToastGame = null
+        detectedGame = null
         saldoValue.text = getString(R.string.saldo_empty)
         liveStatus.text = getString(R.string.status_offline)
         liveStatus.setTextColor(getColor(R.color.muted))
@@ -323,35 +334,34 @@ class MainActivity : android.app.Activity() {
             }
         }
 
-        findViewById<TextView>(R.id.btnClose).setOnClickListener {
-            panel.visibility = View.GONE
-        }
-
+        findViewById<TextView>(R.id.btnClose).setOnClickListener { panel.visibility = View.GONE }
         findViewById<TextView>(R.id.btnMinimize).setOnClickListener { toggleMinimize() }
         panelHeader.setOnClickListener { toggleMinimize() }
         panelHeader.setOnTouchListener(DragListener())
 
         findViewById<TextView>(R.id.btnStakeMinus).setOnClickListener {
-            stake = (stake - 0.5).coerceAtLeast(0.5)
-            stake = (stake * 100).roundToInt() / 100.0
-            refreshStakeLabel()
-            pushSettings()
+            stake = ((stake - 0.5).coerceAtLeast(0.5) * 100).roundToInt() / 100.0
+            refreshStakeLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnStakePlus).setOnClickListener {
-            stake = (stake + 0.5).coerceAtMost(100.0)
-            stake = (stake * 100).roundToInt() / 100.0
-            refreshStakeLabel()
-            pushSettings()
+            stake = ((stake + 0.5).coerceAtMost(100.0) * 100).roundToInt() / 100.0
+            refreshStakeLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnClicksMinus).setOnClickListener {
             clicksPerSession = (clicksPerSession - 1).coerceAtLeast(1)
-            refreshClicksLabel()
-            pushSettings()
+            refreshClicksLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnClicksPlus).setOnClickListener {
             clicksPerSession = (clicksPerSession + 1).coerceAtMost(10)
-            refreshClicksLabel()
-            pushSettings()
+            refreshClicksLabel(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnMinesMinus).setOnClickListener {
+            minesCount = (minesCount - 1).coerceAtLeast(1)
+            refreshMinesLabel(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnMinesPlus).setOnClickListener {
+            minesCount = (minesCount + 1).coerceAtMost(20)
+            refreshMinesLabel(); pushSettings()
         }
 
         btnAuto.setOnClickListener { toggleAuto() }
@@ -371,7 +381,7 @@ class MainActivity : android.app.Activity() {
 
     private fun toggleAuto() {
         if (!autoRunning) {
-            if (!gameDetected) {
+            if (detectedGame == null) {
                 Toast.makeText(this, R.string.auto_no_game, Toast.LENGTH_SHORT).show()
                 return
             }
@@ -402,6 +412,7 @@ class MainActivity : android.app.Activity() {
     private fun pushSettings() {
         sendToGame("setStake", JSONObject().put("value", stake))
         sendToGame("setClicks", JSONObject().put("value", clicksPerSession))
+        sendToGame("setMines", JSONObject().put("value", minesCount))
     }
 
     private fun refreshStakeLabel() {
@@ -412,14 +423,13 @@ class MainActivity : android.app.Activity() {
         clicksValue.text = if (clicksPerSession == 1) "1 clique" else "$clicksPerSession cliques"
     }
 
+    private fun refreshMinesLabel() {
+        minesValue.text = if (minesCount == 1) "1 mina" else "$minesCount minas"
+    }
+
     private fun money(v: Double): String =
         String.format(Locale.US, "%.2f", v).replace(".", ",")
 
-    /**
-     * Envia um comando para o frame do jogo.
-     * postMessage é a única via permitida entre origens diferentes — e o script
-     * injetado em cada frame faz o relay até o iframe do provedor.
-     */
     private fun sendToGame(cmd: String, extra: JSONObject? = null) {
         val payload = JSONObject()
             .put("__archeoLuckyCmd", true)
@@ -440,7 +450,6 @@ class MainActivity : android.app.Activity() {
         webView.post { webView.evaluateJavascript(js, null) }
     }
 
-    /** Arrasta a janela flutuante pela barra de título (toque curto = minimizar). */
     private inner class DragListener : View.OnTouchListener {
         private var dx = 0f
         private var dy = 0f
@@ -451,10 +460,8 @@ class MainActivity : android.app.Activity() {
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = e.rawX
-                    downY = e.rawY
-                    dx = panel.x - e.rawX
-                    dy = panel.y - e.rawY
+                    downX = e.rawX; downY = e.rawY
+                    dx = panel.x - e.rawX; dy = panel.y - e.rawY
                     moved = false
                     return true
                 }
@@ -500,14 +507,9 @@ class MainActivity : android.app.Activity() {
 
     companion object {
         private const val BRIDGE_NAME = "ArcheoBridge"
+        private const val GAME_ARCHEO = "archeo"
+        private const val GAME_MIMINES = "mimines"
 
-        /**
-         * Script injetado em TODOS os frames (inclusive o iframe cross-origin do jogo).
-         * Responsabilidades:
-         *   1. VIGIA do saldo (poll a cada 500ms no texto do frame);
-         *   2. MOTOR da operação automática (clica COMEÇAR, escolhe casas aleatórias,
-         *      faz CASHOUT) + relay de comandos vindos do app.
-         */
         private val WATCHER_JS = """
         (function () {
           try {
@@ -515,66 +517,21 @@ class MainActivity : android.app.Activity() {
             window.__archeoLuckyWatcher = true;
 
             var BRIDGE = 'ArcheoBridge';
-            var AUTO = { running: false, stake: 1, clicks: 3, sessions: 0, wins: 0, losses: 0, busy: false };
+            var AUTO = { running: false, stake: 1, clicks: 3, mines: 3,
+                         sessions: 0, wins: 0, losses: 0, busy: false };
             var seen = {};
+            var announced = null;
+            var lastBal = null;
 
-            function post(obj) {
-              try { var b = window[BRIDGE]; if (b && b.postMessage) { b.postMessage(JSON.stringify(obj)); } } catch (e) {}
+            function post(o) {
+              try { var b = window[BRIDGE]; if (b && b.postMessage) { b.postMessage(JSON.stringify(o)); } } catch (e) {}
             }
-            function hasBoard() { return !!document.querySelector('div.level'); }
             function all(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
             function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-
-            function activeInfo() {
-              var ls = all('div.level');
-              for (var i = 0; i < ls.length; i++) {
-                var a = ls[i].querySelector('.level-active');
-                if (!a) { continue; }
-                var bs = a.querySelectorAll('button[tile]');
-                var vis = Array.prototype.slice.call(bs).filter(function (b) { return b.getBoundingClientRect().width > 0; });
-                if (vis.length >= 4) { return { idx: i, tiles: vis }; }
-              }
-              return null;
+            function money2(v) {
+              var s = Number(v).toFixed(2), p = s.split('.');
+              return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + p[1];
             }
-
-            function openedCount() {
-              return all('stp-gold-digger-level-opened').filter(function (e) {
-                return getComputedStyle(e).display !== 'none';
-              }).length;
-            }
-
-            function cashValue() {
-              var bs = all('button');
-              for (var i = 0; i < bs.length; i++) {
-                var t = (bs[i].innerText || '').trim();
-                if (/CASHOUT/i.test(t)) {
-                  var m = t.match(/([0-9\.]+,[0-9]{2})/);
-                  return m ? parseFloat(m[1].replace(/\./g, '').replace(',', '.')) : 0;
-                }
-              }
-              return 0;
-            }
-
-            function findBtn(re) {
-              var bs = all('button');
-              for (var i = 0; i < bs.length; i++) { if (re.test((bs[i].innerText || '').trim())) { return bs[i]; } }
-              return null;
-            }
-
-            function simClick(el) {
-              if (!el) { return false; }
-              try {
-                var r = el.getBoundingClientRect();
-                var o = { bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
-                try { el.dispatchEvent(new PointerEvent('pointerdown', o)); } catch (e) {}
-                try { el.dispatchEvent(new MouseEvent('mousedown', o)); } catch (e) {}
-                try { el.dispatchEvent(new PointerEvent('pointerup', o)); } catch (e) {}
-                try { el.dispatchEvent(new MouseEvent('mouseup', o)); } catch (e) {}
-                el.click();
-                return true;
-              } catch (e) { return false; }
-            }
-
             function waitFor(fn, timeout, step) {
               step = step || 150;
               return new Promise(function (resolve) {
@@ -588,14 +545,99 @@ class MainActivity : android.app.Activity() {
                 })();
               });
             }
+            function shuffle(a) {
+              for (var i = a.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = a[i]; a[i] = a[j]; a[j] = t;
+              }
+              return a;
+            }
 
-            function setStake(v) {
+            // ------------------------------------------------ deteccao do jogo
+            function archeoBoard() { return document.querySelector('div.level'); }
+            function minesBoard() {
+              return document.querySelector('.number-of-mines') && document.querySelector('canvas');
+            }
+            function game() {
+              if (archeoBoard()) { return 'archeo'; }
+              if (minesBoard()) { return 'mimines'; }
+              return null;
+            }
+
+            // ------------------------------------------------ leitura do saldo
+            function archeoBalance() {
+              var t = (document.body && document.body.innerText) ? document.body.innerText : '';
+              var m = t.match(/Saldo\s*([0-9][0-9\.\s]*,[0-9]{2})\s*FUN/i);
+              return m ? { v: m[1].replace(/\s/g, ''), cur: 'FUN' } : null;
+            }
+            function minesBalance() {
+              var els = document.querySelectorAll('div,span,p');
+              for (var i = 0; i < els.length; i++) {
+                var n = els[i];
+                var p = n.parentElement ? ((n.parentElement.innerText || '').trim().replace(/\s+/g, ' ')) : '';
+                if (/^[0-9][0-9,]*\.[0-9]{2} MZN$/.test(p)) {
+                  var num = parseFloat(p.split(' ')[0].replace(/,/g, ''));
+                  if (!isNaN(num)) { return { v: money2(num), cur: 'MZN' }; }
+                }
+              }
+              return null;
+            }
+
+            function report() {
+              post({ type: 'auto', game: game(), running: AUTO.running, sessions: AUTO.sessions,
+                     wins: AUTO.wins, losses: AUTO.losses, stake: AUTO.stake,
+                     clicks: AUTO.clicks, mines: AUTO.mines });
+            }
+
+            // ================================================= ARCHÉO
+            function arcActive() {
+              var ls = all('div.level');
+              for (var i = 0; i < ls.length; i++) {
+                var a = ls[i].querySelector('.level-active');
+                if (!a) { continue; }
+                var vis = Array.prototype.slice.call(a.querySelectorAll('button[tile]')).filter(function (b) {
+                  return b.getBoundingClientRect().width > 0;
+                });
+                if (vis.length >= 4) { return { idx: i, tiles: vis }; }
+              }
+              return null;
+            }
+            function arcOpened() {
+              return all('stp-gold-digger-level-opened').filter(function (e) {
+                return getComputedStyle(e).display !== 'none';
+              }).length;
+            }
+            function arcBtn(re) {
+              var bs = all('button');
+              for (var i = 0; i < bs.length; i++) { if (re.test((bs[i].innerText || '').trim())) { return bs[i]; } }
+              return null;
+            }
+            function arcCashVal() {
+              var b = arcBtn(/CASHOUT/i);
+              if (!b) { return 0; }
+              var m = (b.innerText || '').match(/([0-9\.]+,[0-9]{2})/);
+              return m ? parseFloat(m[1].replace(/\./g, '').replace(',', '.')) : 0;
+            }
+            function simClick(el) {
+              if (!el) { return false; }
+              try {
+                var r = el.getBoundingClientRect();
+                var o = { bubbles: true, cancelable: true, view: window,
+                          clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+                try { el.dispatchEvent(new PointerEvent('pointerdown', o)); } catch (e) {}
+                try { el.dispatchEvent(new MouseEvent('mousedown', o)); } catch (e) {}
+                try { el.dispatchEvent(new PointerEvent('pointerup', o)); } catch (e) {}
+                try { el.dispatchEvent(new MouseEvent('mouseup', o)); } catch (e) {}
+                el.click();
+                return true;
+              } catch (e) { return false; }
+            }
+            function arcSetStake(v) {
               try {
                 var inp = document.querySelector('input.stake-input') || document.querySelector('input[type=number]');
                 if (!inp) { return false; }
-                var val = Number(v).toFixed(2);
                 var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                setter.call(inp, val);
+                setter.call(inp, Number(v).toFixed(2));
                 inp.dispatchEvent(new Event('input', { bubbles: true }));
                 inp.dispatchEvent(new Event('change', { bubbles: true }));
                 inp.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
@@ -603,25 +645,7 @@ class MainActivity : android.app.Activity() {
                 return true;
               } catch (e) { return false; }
             }
-
-            function report() {
-              post({ type: 'auto', running: AUTO.running, sessions: AUTO.sessions,
-                     wins: AUTO.wins, losses: AUTO.losses, stake: AUTO.stake, clicks: AUTO.clicks });
-            }
-
-            async function waitPick(prevIdx, timeout) {
-              var t0 = Date.now();
-              while (Date.now() - t0 < timeout) {
-                var a = activeInfo();
-                if (a && a.idx > prevIdx) { return { ok: true, idx: a.idx }; }
-                if (!a && openedCount() > 0) { return { ok: false, dead: true }; }
-                if (!a && cashValue() > 0) { return { ok: true, idx: prevIdx }; }
-                await sleep(150);
-              }
-              return { ok: false, timeout: true };
-            }
-
-            function dismissOverlays() {
+            function arcDismiss() {
               try {
                 if (all('.cdk-overlay-container .cdk-overlay-backdrop').length === 0) { return; }
                 var cands = all('button, [role=button]').filter(function (b) {
@@ -632,54 +656,151 @@ class MainActivity : android.app.Activity() {
                 for (var i = 0; i < cands.length; i++) { simClick(cands[i]); }
               } catch (e) {}
             }
-
-            async function runSession() {
-              dismissOverlays();
-              // fecha rodada pendente de antes
-              if (activeInfo() && cashValue() > 0) {
-                simClick(findBtn(/CASHOUT/i));
-                await waitFor(function () { return !activeInfo(); }, 5000);
+            async function arcWaitPick(prevIdx, timeout) {
+              var t0 = Date.now();
+              while (Date.now() - t0 < timeout) {
+                var a = arcActive();
+                if (a && a.idx > prevIdx) { return { ok: true, idx: a.idx }; }
+                if (!a && arcOpened() > 0) { return { ok: false, dead: true }; }
+                if (!a && arcCashVal() > 0) { return { ok: true, idx: prevIdx }; }
+                await sleep(150);
+              }
+              return { ok: false, timeout: true };
+            }
+            async function arcSession() {
+              arcDismiss();
+              if (arcActive() && arcCashVal() > 0) {
+                simClick(arcBtn(/CASHOUT/i));
+                await waitFor(function () { return !arcActive(); }, 5000);
               }
               if (!AUTO.running) { return; }
-
-              setStake(AUTO.stake);
+              arcSetStake(AUTO.stake);
               await sleep(200);
-
-              var startBtn = findBtn(/COME[CÇ]AR/i);
+              var startBtn = arcBtn(/COME[CÇ]AR/i);
               if (!startBtn) { return; }
               simClick(startBtn);
-
-              var s = await waitFor(activeInfo, 7000);
+              var s = await waitFor(arcActive, 7000);
               if (!s) { return; }
-
-              var prev = s.idx;
-              var alive = true;
-
+              var prev = s.idx, alive = true;
               for (var i = 0; i < AUTO.clicks; i++) {
                 if (!AUTO.running) { break; }
-                var a = activeInfo();
+                var a = arcActive();
                 if (!a) { alive = false; break; }
-                var tile = a.tiles[Math.floor(Math.random() * a.tiles.length)];
-                simClick(tile);
-                var res = await waitPick(prev, 7000);
+                simClick(a.tiles[Math.floor(Math.random() * a.tiles.length)]);
+                var res = await arcWaitPick(prev, 7000);
                 if (res && res.ok) { prev = res.idx; } else { alive = false; break; }
               }
-
-              if (alive && cashValue() > 0 && activeInfo()) {
-                simClick(findBtn(/CASHOUT/i));
-                AUTO.wins++;
-                await waitFor(function () { return !activeInfo(); }, 6000);
+              if (alive && arcCashVal() > 0 && arcActive()) {
+                simClick(arcBtn(/CASHOUT/i)); AUTO.wins++;
+                await waitFor(function () { return !arcActive(); }, 6000);
               } else if (alive) {
                 AUTO.wins++;
               } else {
                 AUTO.losses++;
-                await waitFor(function () { return !activeInfo(); }, 4000);
+                await waitFor(function () { return !arcActive(); }, 4000);
               }
-
               AUTO.sessions++;
               report();
             }
 
+            // ================================================= MI MINES (Spribe / canvas)
+            function mmBetBtn() {
+              var bs = all('button');
+              for (var i = 0; i < bs.length; i++) {
+                if (/^bet$/i.test((bs[i].innerText || '').trim())) { return bs[i]; }
+              }
+              return null;
+            }
+            function mmCashBtn() {
+              var bs = all('button');
+              for (var i = 0; i < bs.length; i++) {
+                if (/cash\s*out/i.test(bs[i].innerText || '')) { return bs[i]; }
+              }
+              return null;
+            }
+            function mmCashVal() {
+              var b = mmCashBtn();
+              if (!b) { return null; }
+              var m = (b.innerText || '').match(/([0-9][0-9,]*\.[0-9]{2})/);
+              return m ? parseFloat(m[1].replace(/,/g, '')) : null;
+            }
+            function mmSetMines(n) {
+              try {
+                var opts = all('.number-of-mines .dropdown-list-number button');
+                for (var i = 0; i < opts.length; i++) {
+                  if ((opts[i].innerText || '').trim() === String(n)) { opts[i].click(); return true; }
+                }
+                return false;
+              } catch (e) { return false; }
+            }
+            function mmClickCell(i, j) {
+              var cv = document.querySelector('canvas');
+              if (!cv) { return false; }
+              try {
+                var r = cv.getBoundingClientRect();
+                var x = r.left + r.width * ((i + 0.5) / 5);
+                var y = r.top + r.height * ((j + 0.5) / 5);
+                var o = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y,
+                          button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+                try { cv.dispatchEvent(new PointerEvent('pointermove', o)); } catch (e) {}
+                try { cv.dispatchEvent(new PointerEvent('pointerdown', o)); } catch (e) {}
+                try { cv.dispatchEvent(new MouseEvent('mousedown', o)); } catch (e) {}
+                try { cv.dispatchEvent(new PointerEvent('pointerup', o)); } catch (e) {}
+                try { cv.dispatchEvent(new MouseEvent('mouseup', o)); } catch (e) {}
+                try { cv.dispatchEvent(new MouseEvent('click', o)); } catch (e) {}
+                return true;
+              } catch (e) { return false; }
+            }
+            async function mmSession() {
+              if (!AUTO.running) { return; }
+              if (mmCashBtn()) {
+                mmCashBtn().click();
+                await waitFor(mmBetBtn, 8000);
+              }
+              if (!AUTO.running) { return; }
+              mmSetMines(AUTO.mines);
+              await sleep(300);
+              var bet = mmBetBtn();
+              if (!bet) { return; }
+              bet.click();
+              var opened = await waitFor(mmCashBtn, 8000);
+              if (!opened) { return; }
+
+              var cells = [];
+              for (var i = 0; i < 5; i++) { for (var j = 0; j < 5; j++) { cells.push([i, j]); } }
+              shuffle(cells);
+
+              var alive = true;
+              for (var k = 0; k < AUTO.clicks && k < cells.length; k++) {
+                if (!AUTO.running) { break; }
+                var prevCash = mmCashVal();
+                mmClickCell(cells[k][0], cells[k][1]);
+                var res = await waitFor(function () {
+                  if (mmBetBtn() && !mmCashBtn()) { return 'dead'; }
+                  var v = mmCashVal();
+                  if (v !== null && v !== prevCash) { return 'alive'; }
+                  return null;
+                }, 8000);
+                if (res === 'alive') { await sleep(300); } else { alive = false; break; }
+              }
+
+              if (alive && mmCashBtn()) {
+                mmCashBtn().click(); AUTO.wins++;
+                await waitFor(mmBetBtn, 8000);
+              } else {
+                AUTO.losses++;
+                await waitFor(mmBetBtn, 4000);
+              }
+              AUTO.sessions++;
+              report();
+            }
+
+            // ================================================= ciclo
+            async function runSession() {
+              var g = game();
+              if (g === 'mimines') { return mmSession(); }
+              if (g === 'archeo') { return arcSession(); }
+            }
             async function loop() {
               if (AUTO.busy) { return; }
               AUTO.busy = true;
@@ -692,30 +813,29 @@ class MainActivity : android.app.Activity() {
             }
 
             function handleCmd(d) {
-              if (!hasBoard()) { return false; }
+              if (!game()) { return false; }
               switch (d.cmd) {
                 case 'setStake':
                   AUTO.stake = Number(d.value) || 1;
-                  setStake(AUTO.stake);
-                  report();
-                  return true;
+                  if (game() === 'archeo') { arcSetStake(AUTO.stake); }
+                  report(); return true;
                 case 'setClicks':
-                  AUTO.clicks = Math.min(10, Math.max(1, Number(d.value) || 3));
-                  report();
-                  return true;
+                  AUTO.clicks = Math.min(24, Math.max(1, Number(d.value) || 3));
+                  report(); return true;
+                case 'setMines':
+                  AUTO.mines = Math.min(20, Math.max(1, Number(d.value) || 3));
+                  if (game() === 'mimines') { mmSetMines(AUTO.mines); }
+                  report(); return true;
                 case 'start':
                   if (!AUTO.running) { AUTO.running = true; report(); loop(); }
                   return true;
                 case 'stop':
-                  AUTO.running = false; report();
-                  return true;
+                  AUTO.running = false; report(); return true;
                 case 'status':
-                  report();
-                  return true;
+                  report(); return true;
               }
               return false;
             }
-
             function relay(d) {
               try {
                 var fs = document.querySelectorAll('iframe');
@@ -728,33 +848,29 @@ class MainActivity : android.app.Activity() {
               if (!d || !d.__archeoLuckyCmd) { return; }
               if (d.id && seen[d.id]) { return; }
               if (d.id) { seen[d.id] = 1; }
-              var handled = handleCmd(d);
-              if (!handled) { relay(d); }
+              if (!handleCmd(d)) { relay(d); }
             });
 
-            // ------------------------------------------------ vigia do saldo
-            var href = String(location.href || '');
-            if (/archeo/i.test(href) && /(pridebet|splitthepot|playdemo)/i.test(href)) {
-              post({ type: 'hello', url: href });
-            }
-
-            var last = null;
+            // ------------------------------------------------ vigia (saldo + anuncio)
             function scan() {
               try {
-                var txt = (document.body && document.body.innerText) ? document.body.innerText : '';
-                if (!txt) { return; }
-                var m = txt.match(/Saldo\s*([0-9][0-9\.\s]*,[0-9]{2})\s*FUN/i);
-                if (m) {
-                  var v = m[1].replace(/\s/g, '');
-                  if (v !== last) { last = v; post({ type: 'saldo', value: v, url: String(location.href || '') }); }
+                var g = game();
+                if (g && g !== announced) {
+                  announced = g;
+                  post({ type: 'hello', game: g, url: String(location.href || '') });
+                }
+                if (!g) { return; }
+                var b = (g === 'mimines') ? minesBalance() : archeoBalance();
+                if (b && b.v !== lastBal) {
+                  lastBal = b.v;
+                  post({ type: 'saldo', value: b.v, currency: b.cur });
                 }
               } catch (e) {}
             }
-
             scan();
             setInterval(scan, 500);
             document.addEventListener('DOMContentLoaded', scan);
-            document.addEventListener('click', function () { setTimeout(scan, 400); }, true);
+            document.addEventListener('click', function () { setTimeout(scan, 350); }, true);
           } catch (e) {}
         })();
         """.trimIndent()

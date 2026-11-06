@@ -122,3 +122,11 @@ O toast dispara uma vez por sessão (reset ao sair do jogo).
 App de estudo/entretenimento. Todos os saldos exibidos vêm do **modo demonstração** da
 plataforma (fichas FUN, sem dinheiro real). Não é afiliado à PrideBet nem ao provedor do jogo.
 Jogos de azar têm margem estrutural a favor da casa. Proibido para menores de 18 anos.
+
+## v1.2 — Mi Mines
+
+- Abrir o **Mi Mines** (`pridebet.co.mz/games/Mines-6`) exibe o toast **"Mi Mines Carregado ✅✅✅"**.
+- Nova opção em **Configurações**: **MINAS (MI MINES)** de **1 a 20** (stepper − / +), aplicada no jogo antes de cada rodada.
+- Motor automático para o Mi Mines: tabuleiro é `<canvas>`, então o clique é feito por **evento sintético na coordenada** da casa sorteada.
+- Saldo em tempo real passa a mostrar **MZN** (Mi Mines) ou **FUN** (Archéo), detectado automaticamente.
+
