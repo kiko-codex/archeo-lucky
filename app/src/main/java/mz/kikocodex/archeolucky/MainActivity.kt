@@ -17,6 +17,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
 import android.widget.Toast
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import org.json.JSONObject
@@ -173,10 +175,10 @@ class MainActivity : android.app.Activity() {
             val listener = object : WebViewCompat.WebMessageListener {
                 override fun onPostMessage(
                     view: WebView,
-                    message: WebViewCompat.WebMessageCompat,
+                    message: WebMessageCompat,
                     sourceOrigin: Uri,
                     isMainFrame: Boolean,
-                    replyProxy: WebViewCompat.JavaScriptReplyProxy
+                    replyProxy: JavaScriptReplyProxy
                 ) {
                     val raw = message.data ?: return
                     ui.post { handleBridgeMessage(raw) }
