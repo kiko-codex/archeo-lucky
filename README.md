@@ -123,6 +123,16 @@ App de estudo/entretenimento. Todos os saldos exibidos vêm do **modo demonstra�
 plataforma (fichas FUN, sem dinheiro real). Não é afiliado à PrideBet nem ao provedor do jogo.
 Jogos de azar têm margem estrutural a favor da casa. Proibido para menores de 18 anos.
 
+
+## v1.3 — Stake no Mi Mines + investigação do RNG
+
+- O **stake agora é aplicado no Mi Mines**. O jogo só aceita valores de uma escada fixa de 15 níveis
+  (**8,00 · 16,00 · 24,00 · 32,00 · 40,00 · 48,00 · 56,00 · 64,00 · 96,00 · 160,00 · 320,00 · 800,00 · 1.600,00 · 4.000,00 · 8.000,00 MZN**),
+  então o app **encosta** o valor escolhido no nível mais próximo e mostra o valor real no painel.
+- Os botões **− / +** do painel passam a andar **direto na escada** quando o Mi Mines está aberto
+  (no Archéo continuam em passos de 0,50 FUN).
+- O rótulo do painel troca de moeda sozinho: **MZN** no Mi Mines, **FUN** no Archéo.
+
 ## v1.2 — Mi Mines
 
 - Abrir o **Mi Mines** (`pridebet.co.mz/games/Mines-6`) exibe o toast **"Mi Mines Carregado ✅✅✅"**.

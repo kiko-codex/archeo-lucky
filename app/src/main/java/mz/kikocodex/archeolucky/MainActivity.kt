@@ -71,6 +71,7 @@ class MainActivity : android.app.Activity() {
     private var stake = 1.0
     private var clicksPerSession = 3
     private var minesCount = 3
+    private var minesLadder: List<Double> = emptyList()
     private var autoRunning = false
     private var panelMinimized = false
 
@@ -191,6 +192,7 @@ class MainActivity : android.app.Activity() {
         lastToastGame = game
         val res = if (game == GAME_MIMINES) R.string.mines_toast else R.string.game_toast
         Toast.makeText(this, res, Toast.LENGTH_LONG).show()
+        refreshStakeLabel()
         liveStatus.text = getString(R.string.status_live)
         liveStatus.setTextColor(getColor(R.color.green))
         statusLine.text = if (game == GAME_MIMINES) "Mi Mines · lendo saldo…" else "Archéo · lendo saldo…"
@@ -242,6 +244,17 @@ class MainActivity : android.app.Activity() {
                     }
                 }
 
+                "ladder" -> {
+                    val arr = json.optJSONArray("values") ?: return
+                    val lista = ArrayList<Double>(arr.length())
+                    for (i in 0 until arr.length()) lista.add(arr.optDouble(i))
+                    if (lista.isNotEmpty()) {
+                        minesLadder = lista.sorted()
+                        stake = nearestLadder(stake)
+                        refreshStakeLabel()
+                    }
+                }
+
                 "auto" -> handleAutoReport(json)
             }
         } catch (_: Exception) {
@@ -257,6 +270,10 @@ class MainActivity : android.app.Activity() {
         val wins = json.optInt("wins", 0)
         val losses = json.optInt("losses", 0)
         val st = json.optDouble("stake", stake)
+        if (detectedGame == GAME_MIMINES && !st.isNaN() && kotlin.math.abs(st - stake) > 0.004) {
+            stake = st
+            refreshStakeLabel()
+        }
         val ck = json.optInt("clicks", clicksPerSession)
         val mn = json.optInt("mines", minesCount)
         val game = if (detectedGame == GAME_MIMINES) "Mi Mines" else "Archéo"
@@ -340,11 +357,13 @@ class MainActivity : android.app.Activity() {
         panelHeader.setOnTouchListener(DragListener())
 
         findViewById<TextView>(R.id.btnStakeMinus).setOnClickListener {
-            stake = ((stake - 0.5).coerceAtLeast(0.5) * 100).roundToInt() / 100.0
+            stake = if (usaEscada()) stepLadder(-1)
+            else ((stake - 0.5).coerceAtLeast(0.5) * 100).roundToInt() / 100.0
             refreshStakeLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnStakePlus).setOnClickListener {
-            stake = ((stake + 0.5).coerceAtMost(100.0) * 100).roundToInt() / 100.0
+            stake = if (usaEscada()) stepLadder(1)
+            else ((stake + 0.5).coerceAtMost(100.0) * 100).roundToInt() / 100.0
             refreshStakeLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnClicksMinus).setOnClickListener {
@@ -416,7 +435,7 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun refreshStakeLabel() {
-        stakeValue.text = "${money(stake)} FUN"
+        stakeValue.text = if (detectedGame == GAME_MIMINES) "${money(stake)} MZN" else "${money(stake)} FUN"
     }
 
     private fun refreshClicksLabel() {
@@ -425,6 +444,22 @@ class MainActivity : android.app.Activity() {
 
     private fun refreshMinesLabel() {
         minesValue.text = if (minesCount == 1) "1 mina" else "$minesCount minas"
+    }
+
+    /** Mi Mines só aceita valores da escada do jogo (8,00 / 16,00 / 24,00 ... 8.000,00). */
+    private fun usaEscada(): Boolean = detectedGame == GAME_MIMINES && minesLadder.isNotEmpty()
+
+    private fun nearestLadder(v: Double): Double {
+        if (minesLadder.isEmpty()) return v
+        return minesLadder.minByOrNull { kotlin.math.abs(it - v) } ?: v
+    }
+
+    private fun stepLadder(dir: Int): Double {
+        if (minesLadder.isEmpty()) return stake
+        val idx = minesLadder.indexOfFirst { kotlin.math.abs(it - stake) < 0.004 }
+        val base = if (idx >= 0) idx else minesLadder.indexOf(nearestLadder(stake))
+        val novo = (base + dir).coerceIn(0, minesLadder.lastIndex)
+        return minesLadder[novo]
     }
 
     private fun money(v: Double): String =
@@ -583,10 +618,20 @@ class MainActivity : android.app.Activity() {
               return null;
             }
 
+            var ladderSent = '';
             function report() {
               post({ type: 'auto', game: game(), running: AUTO.running, sessions: AUTO.sessions,
                      wins: AUTO.wins, losses: AUTO.losses, stake: AUTO.stake,
                      clicks: AUTO.clicks, mines: AUTO.mines });
+              try {
+                if (game() === 'mimines') {
+                  var l = mmLadderValues();
+                  if (l.length && l.join(',') !== ladderSent) {
+                    ladderSent = l.join(',');
+                    post({ type: 'ladder', values: l });
+                  }
+                }
+              } catch (e) {}
             }
 
             // ================================================= ARCHÉO
@@ -724,6 +769,65 @@ class MainActivity : android.app.Activity() {
               var m = (b.innerText || '').match(/([0-9][0-9,]*\.[0-9]{2})/);
               return m ? parseFloat(m[1].replace(/,/g, '')) : null;
             }
+            function mmBetDisplay() {
+              var d = document.querySelector('.bet-controls');
+              if (!d) { return null; }
+              var m = ((d.innerText || '').replace(/\s+/g, ' ')).match(/Bet MZN\s*([0-9][0-9,]*\.[0-9]{2})/i);
+              return m ? parseFloat(m[1].replace(/,/g, '')) : null;
+            }
+            function mmLadderValues() {
+              var out = [], items = all('.fast-bets-menu .dropdown-item');
+              for (var i = 0; i < items.length; i++) {
+                var t = (items[i].innerText || '').trim();
+                if (/^[0-9][0-9,]*\.[0-9]{2}$/.test(t)) { out.push(parseFloat(t.replace(/,/g, ''))); }
+              }
+              out.sort(function (a, b) { return a - b; });
+              return out;
+            }
+            function mmItemText(v) {
+              var s = Number(v).toFixed(2).split('.');
+              return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + s[1];
+            }
+            function mmToggleBetMenu(open) {
+              var btn = document.querySelector('.bet-controls .all');
+              if (!btn) { return false; }
+              var aberto = document.querySelector('.fast-bets-menu.show') !== null;
+              if (open === aberto) { return false; }
+              btn.click();
+              return true;
+            }
+            async function mmSetStake(target) {
+              try {
+                target = Number(target) || 8;
+                var cur = mmBetDisplay();
+                var ladder = mmLadderValues();
+                if (!ladder.length) {
+                  mmToggleBetMenu(true);
+                  await waitFor(function () { return mmLadderValues().length > 0; }, 2500);
+                  ladder = mmLadderValues();
+                }
+                if (!ladder.length) { return null; }
+                var best = ladder[0], bd = Math.abs(ladder[0] - target);
+                for (var i = 1; i < ladder.length; i++) {
+                  var d = Math.abs(ladder[i] - target);
+                  if (d < bd) { bd = d; best = ladder[i]; }
+                }
+                if (cur !== null && Math.abs(cur - best) < 0.005) { mmToggleBetMenu(false); return cur; }
+                if (!document.querySelector('.fast-bets-menu.show')) {
+                  mmToggleBetMenu(true);
+                  await waitFor(function () { return document.querySelector('.fast-bets-menu.show'); }, 1500);
+                }
+                var itens = all('.fast-bets-menu .dropdown-item');
+                var txt = mmItemText(best);
+                for (var j = 0; j < itens.length; j++) {
+                  if ((itens[j].innerText || '').trim() === txt) { itens[j].click(); break; }
+                }
+                await sleep(350);
+                mmToggleBetMenu(false);
+                await sleep(200);
+                return mmBetDisplay();
+              } catch (e) { return null; }
+            }
             function mmSetMines(n) {
               try {
                 var opts = all('.number-of-mines .dropdown-list-number button');
@@ -759,7 +863,13 @@ class MainActivity : android.app.Activity() {
               }
               if (!AUTO.running) { return; }
               mmSetMines(AUTO.mines);
-              await sleep(300);
+              await sleep(250);
+              var aplicado = await mmSetStake(AUTO.stake);
+              if (aplicado !== null && Math.abs(aplicado - AUTO.stake) > 0.005) {
+                AUTO.stake = aplicado;
+                report();
+              }
+              await sleep(200);
               var bet = mmBetBtn();
               if (!bet) { return; }
               bet.click();
@@ -818,6 +928,7 @@ class MainActivity : android.app.Activity() {
                 case 'setStake':
                   AUTO.stake = Number(d.value) || 1;
                   if (game() === 'archeo') { arcSetStake(AUTO.stake); }
+                  if (game() === 'mimines') { mmSetStake(AUTO.stake); }
                   report(); return true;
                 case 'setClicks':
                   AUTO.clicks = Math.min(24, Math.max(1, Number(d.value) || 3));
