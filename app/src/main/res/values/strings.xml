@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Archeo Lucky</string>
+    <string name="game_toast">jogo Lindo com sucesso ✅✅</string>
+    <string name="saldo_label">SALDO DO JOGO</string>
+    <string name="saldo_empty">— FUN</string>
+    <string name="status_offline">aguardando jogo</string>
+    <string name="status_live">AO VIVO</string>
+    <string name="go_google">Ir para o Google</string>
+</resources>

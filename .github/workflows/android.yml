@@ -1,0 +1,61 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Compilar APK (Kotlin)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Configurar Gradle (com cache)
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build do APK debug
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Mostrar info do APK
+        run: |
+          ls -lh app/build/outputs/apk/debug/
+          echo "### ✅ APK gerado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Baixe em **Artifacts → archeo-lucky-debug-apk**." >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload do APK (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: archeo-lucky-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publicar Release (quando a tag for v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Archeo Lucky ${{ github.ref_name }}
+          files: app/build/outputs/apk/debug/app-debug.apk
+          generate_release_notes: true
