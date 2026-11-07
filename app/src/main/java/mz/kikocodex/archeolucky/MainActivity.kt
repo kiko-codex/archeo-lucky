@@ -67,6 +67,10 @@ class MainActivity : android.app.Activity() {
     private lateinit var rowAlvo: View
     private lateinit var rowRegra: View
     private lateinit var rowNomes: View
+    private lateinit var rowCopy: View
+    private lateinit var copyInput: android.widget.EditText
+    private lateinit var btnCopy: TextView
+    private lateinit var copyStatus: TextView
     private lateinit var rowGale: View
     private lateinit var btnGale: TextView
     private lateinit var multValue: TextView
@@ -96,6 +100,9 @@ class MainActivity : android.app.Activity() {
     private var galeMult = 2.00
     private var galeLimit = 3
     private var galeUnlimited = false
+
+    // Copy trader (Aviator)
+    private var copyAlvo = ""
     private var minesLadder: List<Double> = emptyList()
     private var autoRunning = false
     private var panelMinimized = false
@@ -135,6 +142,10 @@ class MainActivity : android.app.Activity() {
         rowRegra = findViewById(R.id.rowRegra)
         rowNomes = findViewById(R.id.rowNomes)
         rowGale = findViewById(R.id.rowGale)
+        rowCopy = findViewById(R.id.rowCopy)
+        copyInput = findViewById(R.id.copyInput)
+        btnCopy = findViewById(R.id.btnCopy)
+        copyStatus = findViewById(R.id.copyStatus)
         btnGale = findViewById(R.id.btnGale)
         multValue = findViewById(R.id.multValue)
         btnSemLimite = findViewById(R.id.btnSemLimite)
@@ -288,6 +299,7 @@ class MainActivity : android.app.Activity() {
         rowMines.visibility = if (mm) View.VISIBLE else View.GONE
         rowClicks.visibility = if (av) View.GONE else View.VISIBLE
         rowGale.visibility = if (av) View.GONE else View.VISIBLE
+        rowCopy.visibility = if (av) View.VISIBLE else View.GONE
     }
 
     // ============================================== Ponte do saldo (real-time)
@@ -348,6 +360,18 @@ class MainActivity : android.app.Activity() {
                 }
 
                 "auto" -> handleAutoReport(json)
+
+                "copy" -> {
+                    val alvo = json.optString("alvo", copyAlvo)
+                    val achou = json.optBoolean("encontrado", false)
+                    val feitas = json.optInt("copiadas", 0)
+                    if (alvo.isNotEmpty()) {
+                        copyStatus.text = if (achou)
+                            "● copiando $alvo · $feitas apostas"
+                        else
+                            "○ $alvo não encontrado (abra o painel All Bets)"
+                    }
+                }
             }
         } catch (_: Exception) {
             // não é JSON: ignora
@@ -404,6 +428,7 @@ class MainActivity : android.app.Activity() {
                 append("\nstake ").append(money(stake))
                 append(" · alvo ").append(String.format(Locale.US, "%.2f", alvo).replace(".", ",")).append("x")
                 append(" · ").append(if (avRegra == "sempre") "sempre" else "após baixa")
+                if (copyAlvo.isNotEmpty()) append("\nCOPY: ").append(copyAlvo)
             } else {
                 append("\nsessões: ").append(sessions)
                 append("   W: ").append(wins).append("   L: ").append(losses)
@@ -562,6 +587,26 @@ class MainActivity : android.app.Activity() {
             refreshNomesLabel(); pushSettings()
         }
 
+        btnCopy.setOnClickListener {
+            if (copyAlvo.isNotEmpty()) {
+                copyAlvo = ""
+                copyInput.setText("")
+                copyStatus.text = getString(R.string.copy_off)
+                btnCopy.text = getString(R.string.copy_start)
+                pushSettings()
+            } else {
+                val cod = copyInput.text.toString().trim().uppercase(Locale.ROOT)
+                if (cod.isBlank()) {
+                    Toast.makeText(this, "Digite o código do jogador (ex: J05)", Toast.LENGTH_SHORT).show()
+                } else {
+                    copyAlvo = cod
+                    btnCopy.text = getString(R.string.copy_stop)
+                    copyStatus.text = "procurando $cod…"
+                    pushSettings()
+                }
+            }
+        }
+
         btnAuto.setOnClickListener { toggleAuto() }
 
         findViewById<TextView>(R.id.btnGoGoogle).setOnClickListener {
@@ -618,6 +663,7 @@ class MainActivity : android.app.Activity() {
         sendToGame("setGaleMult", JSONObject().put("value", galeMult))
         sendToGame("setGaleLimit", JSONObject().put("value", galeLimit))
         sendToGame("setGaleUnlimited", JSONObject().put("value", galeUnlimited))
+        sendToGame("setCopy", JSONObject().put("value", copyAlvo))
     }
 
     /** Guarda o nº de cliques no jogo certo (Archéo 3, Mi Mines 5 por padrão). */
@@ -779,7 +825,8 @@ class MainActivity : android.app.Activity() {
                          alvo: 2, regra: 'aposBaixa', nomes: 'anon',
                          velas: 0, puladas: 0,
                          galeOn: true, galeMult: 2, galeLimit: 3,
-                         galeUnlimited: false, galeStep: 0, stakeBase: 1 };
+                         galeUnlimited: false, galeStep: 0, stakeBase: 1,
+                         copyAlvo: '' };
             var seen = {};
             var announced = null;
             var lastBal = null;
@@ -1015,6 +1062,29 @@ class MainActivity : android.app.Activity() {
               out.sort(function (a, b) { return a - b; });
               return out;
             }
+            function mmStakeInput() {
+              var d = document.querySelector('.bet-controls');
+              if (!d) { return null; }
+              var ins = d.querySelectorAll('input');
+              for (var i = 0; i < ins.length; i++) {
+                if (ins[i].getBoundingClientRect().width > 0) { return ins[i]; }
+              }
+              return null;
+            }
+            // Digita o valor direto no input do jogo: nao depende da escada.
+            async function mmSetStakeLivre(v) {
+              var inp = mmStakeInput();
+              if (!inp) { return null; }
+              try { inp.focus(); } catch (e) {}
+              avSetVal(inp, Number(v).toFixed(2));
+              await sleep(200);
+              try {
+                inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+              } catch (e) {}
+              try { inp.blur(); } catch (e) {}
+              await sleep(220);
+              return mmBetDisplay();
+            }
             function mmItemText(v) {
               var s = Number(v).toFixed(2).split('.');
               return s[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + s[1];
@@ -1030,6 +1100,10 @@ class MainActivity : android.app.Activity() {
             async function mmSetStake(target) {
               try {
                 target = Number(target) || 8;
+                // 1o caminho: digitar direto no input (aceita qualquer valor)
+                var livre = await mmSetStakeLivre(target);
+                if (livre !== null && Math.abs(livre - target) < 0.02) { return livre; }
+                // 2o caminho (fallback): escada de niveis do jogo
                 var cur = mmBetDisplay();
                 var ladder = mmLadderValues();
                 if (!ladder.length) {
@@ -1266,12 +1340,140 @@ class MainActivity : android.app.Activity() {
                 return { stake: v0, alvo: v1, autoCashout: ligado };
               } catch (e) { return null; }
             }
+            // ---------------------------------------------- copy trader
+            function avSetStake(v) {
+              var c = avCtrl();
+              if (!c) { return false; }
+              var ins = [], raw = c.querySelectorAll('input');
+              for (var i = 0; i < raw.length; i++) {
+                if (raw[i].getBoundingClientRect().width > 0) { ins.push(raw[i]); }
+              }
+              if (!ins[0]) { return false; }
+              avSetVal(ins[0], Number(v).toFixed(2));
+              return true;
+            }
+            function avCashBtn() {
+              var c = avCtrl();
+              if (!c) { return null; }
+              var bs = c.querySelectorAll('button');
+              for (var i = 0; i < bs.length; i++) {
+                var t = (bs[i].innerText || '').replace(/\s+/g, ' ').trim();
+                if (/cash\s*out|cashout/i.test(t)) { return bs[i]; }
+                if (/^[0-9]+[.,][0-9]{2}x$/i.test(t)) { return bs[i]; }
+              }
+              return null;
+            }
+            function numP(s) {
+              if (!s) { return null; }
+              s = String(s).trim();
+              var d = s.lastIndexOf('.'), c = s.lastIndexOf(',');
+              if (d > c) { s = s.replace(/,/g, ''); }
+              else { s = s.replace(/\./g, '').replace(',', '.'); }
+              var v = parseFloat(s);
+              return isNaN(v) ? null : v;
+            }
+            // Procura a linha do jogador na lista de apostas.
+            // Aceita o apelido (J05) e o codigo cru (d***4).
+            function avFindRow(codigo) {
+              if (!codigo) { return null; }
+              var alvo = String(codigo).toUpperCase();
+              var nJ = /^J([0-9]{2})$/.test(alvo) ? parseInt(alvo.slice(1), 10) : null;
+              var els = document.querySelectorAll('*');
+              for (var i = 0; i < els.length; i++) {
+                var e = els[i];
+                if (e.children.length) { continue; }
+                var t = (e.innerText || '').trim();
+                if (!t || t.length > 10) { continue; }
+                var up = t.toUpperCase();
+                var bate = (up === alvo);
+                if (!bate && nJ !== null && /^D\*+[0-9]$/.test(up)) {
+                  bate = (up === 'D***' + (nJ - 1));
+                }
+                if (!bate) { continue; }
+                var row = e;
+                for (var k = 0; k < 4 && row; k++) {
+                  var txt = (row.innerText || '').replace(/\s+/g, ' ').trim();
+                  if (/[0-9][0-9.,]*/.test(txt) && txt.length <= 90) {
+                    return { row: row, txt: txt };
+                  }
+                  row = row.parentElement;
+                }
+              }
+              return null;
+            }
+            function avParseRow(txt) {
+              // remove o nome/codigo antes de procurar numeros (o digito do
+              // apelido, ex. d***4, nao pode virar stake)
+              var limpo = String(txt)
+                .replace(/[A-Za-z]\*+[0-9A-Za-z]*/g, ' ')
+                .replace(/\bJ[0-9]{2}\b/gi, ' ');
+              var cash = null;
+              var mc = limpo.match(/([0-9][0-9.,]*)\s*x/i);
+              if (mc) { cash = numP(mc[1]); }
+              var resto = limpo.replace(/[0-9][0-9.,]*\s*x/ig, ' ');
+              var nums = resto.match(/[0-9][0-9.,]*/g) || [];
+              var stake = null;
+              for (var i = 0; i < nums.length; i++) {
+                var v = numP(nums[i]);
+                if (v !== null && v > 0 && v < 1000000) { stake = v; break; }
+              }
+              return { stake: stake, cash: cash };
+            }
+            async function avCfgCopy() {
+              try {
+                var c = avCtrl();
+                if (!c) { return; }
+                var sw = c.querySelector('.cash-out-switcher .input-switch');
+                if (sw && !/(^|\s)off(\s|$)/.test(sw.className || '')) { sw.click(); await sleep(300); }
+              } catch (e) {}
+            }
+            async function avCopyLoop() {
+              var alvo = String(AUTO.copyAlvo || '').toUpperCase();
+              await avCfgCopy();
+              var nosso = false, copiadas = 0, achou = false, ultimaTent = 0;
+              post({ type: 'copy', alvo: alvo, encontrado: false, copiadas: 0 });
+              while (AUTO.running) {
+                var r = avFindRow(alvo);
+                if (!r) {
+                  achou = false;
+                  nosso = false;
+                  ultimaTent = 0;
+                } else {
+                  achou = true;
+                  var p = avParseRow(r.txt);
+                  // apostou e ainda nao sacou -> replica a entrada
+                  if (p.stake !== null && p.cash === null && !nosso) {
+                    var agora = Date.now();
+                    if (agora - ultimaTent > 1200 && avBetBtn()) {
+                      ultimaTent = agora;
+                      avSetStake(p.stake);
+                      await sleep(150);
+                      var b = avBetBtn();
+                      if (b) {
+                        try { b.click(); } catch (e) {}
+                        nosso = true;
+                        copiadas++;
+                      }
+                    }
+                  }
+                  // sacou -> replica a saida
+                  if (p.cash !== null && nosso) {
+                    var cb = avCashBtn();
+                    if (cb) { try { cb.click(); } catch (e) {} }
+                    nosso = false;
+                  }
+                }
+                post({ type: 'copy', alvo: alvo, encontrado: achou, copiadas: copiadas });
+                await sleep(200);
+              }
+            }
             function avDecide(m) {
               if (AUTO.regra === 'sempre') { return true; }
               return (m !== null && !isNaN(m) && m < Number(AUTO.alvo));
             }
             async function avSession() {
               if (!AUTO.running) { return; }
+              if (AUTO.copyAlvo) { return avCopyLoop(); }
               var cfg = await avApplyConfig();
               if (cfg && cfg.stake !== null && !isNaN(cfg.stake) && Math.abs(cfg.stake - AUTO.stake) > 0.005) {
                 AUTO.stake = cfg.stake;
@@ -1321,7 +1523,8 @@ class MainActivity : android.app.Activity() {
                 var t = node.nodeValue || '';
                 var m = t.trim().match(/^([A-Za-z])\*{2,}([0-9])$/);
                 if (!m) { return; }
-                node.nodeValue = 'Jogador ' + (parseInt(m[2], 10) + 1);
+                var nn = parseInt(m[2], 10) + 1;
+                node.nodeValue = 'J' + (nn < 10 ? '0' + nn : '' + nn);
               } catch (e) {}
             }
             function avNmScan() {
@@ -1374,6 +1577,9 @@ class MainActivity : android.app.Activity() {
             function handleCmd(d) {
               if (!game()) { return false; }
               switch (d.cmd) {
+                case 'setCopy':
+                  AUTO.copyAlvo = String(d.value || '').toUpperCase();
+                  report(); return true;
                 case 'setGale':
                   AUTO.galeOn = !!d.on;
                   if (!AUTO.galeOn) { AUTO.galeStep = 0; AUTO.stake = AUTO.stakeBase || AUTO.stake; }

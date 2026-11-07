@@ -509,6 +509,75 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- ===== COPY TRADER (Aviator) ===== -->
+            <LinearLayout
+                android:id="@+id/rowCopy"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_copy"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/copyInput"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center_vertical"
+                        android:hint="@string/copy_hint"
+                        android:inputType="textCapCharacters"
+                        android:maxLength="8"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:singleLine="true"
+                        android:textColor="#FFF2F2F5"
+                        android:textColorHint="@color/muted"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/btnCopy"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:minWidth="78dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:text="@string/copy_start"
+                        android:textColor="@color/gold"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/copyStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text=""
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+            </LinearLayout>
+
             <!-- ===== ALVO / AUTO-CASHOUT (Aviator) ===== -->
             <LinearLayout
                 android:id="@+id/rowAlvo"
