@@ -67,6 +67,11 @@ class MainActivity : android.app.Activity() {
     private lateinit var rowAlvo: View
     private lateinit var rowRegra: View
     private lateinit var rowNomes: View
+    private lateinit var rowGale: View
+    private lateinit var btnGale: TextView
+    private lateinit var multValue: TextView
+    private lateinit var btnSemLimite: TextView
+    private lateinit var limitValue: TextView
     private lateinit var alvoValue: TextView
     private lateinit var btnRegra: TextView
     private lateinit var btnNomes: TextView
@@ -80,6 +85,17 @@ class MainActivity : android.app.Activity() {
     private var stake = 1.0
     private var clicksPerSession = 3
     private var minesCount = 3
+
+    // Padroes fixados pela operacao:
+    //   Mi Mines -> 3 minas, 5 cliques   |   Archeo -> 3 cliques
+    private var clicksArcheo = 3
+    private var clicksMines = 5
+
+    // Martingale
+    private var galeOn = true
+    private var galeMult = 2.00
+    private var galeLimit = 3
+    private var galeUnlimited = false
     private var minesLadder: List<Double> = emptyList()
     private var autoRunning = false
     private var panelMinimized = false
@@ -118,6 +134,11 @@ class MainActivity : android.app.Activity() {
         rowAlvo = findViewById(R.id.rowAlvo)
         rowRegra = findViewById(R.id.rowRegra)
         rowNomes = findViewById(R.id.rowNomes)
+        rowGale = findViewById(R.id.rowGale)
+        btnGale = findViewById(R.id.btnGale)
+        multValue = findViewById(R.id.multValue)
+        btnSemLimite = findViewById(R.id.btnSemLimite)
+        limitValue = findViewById(R.id.limitValue)
         alvoValue = findViewById(R.id.alvoValue)
         btnRegra = findViewById(R.id.btnRegra)
         btnNomes = findViewById(R.id.btnNomes)
@@ -134,6 +155,7 @@ class MainActivity : android.app.Activity() {
         refreshAlvoLabel()
         refreshRegraLabel()
         refreshNomesLabel()
+        refreshGaleUi()
         updatePanelVisibility()
 
         val deepLink = intent?.dataString
@@ -220,6 +242,16 @@ class MainActivity : android.app.Activity() {
                 avRegra = "aposBaixa"
                 refreshAlvoLabel(); refreshRegraLabel(); refreshNomesLabel()
             }
+            if (game == GAME_MIMINES) {
+                minesCount = 3
+                clicksPerSession = clicksMines
+                refreshMinesLabel(); refreshClicksLabel()
+            }
+            if (game == GAME_ARCHEO) {
+                clicksPerSession = clicksArcheo
+                refreshClicksLabel()
+            }
+            refreshGaleUi()
             autoStatus.text = getString(resToastOf(game))
             updatePanelVisibility()
         }
@@ -255,6 +287,7 @@ class MainActivity : android.app.Activity() {
         rowNomes.visibility = if (av) View.VISIBLE else View.GONE
         rowMines.visibility = if (mm) View.VISIBLE else View.GONE
         rowClicks.visibility = if (av) View.GONE else View.VISIBLE
+        rowGale.visibility = if (av) View.GONE else View.VISIBLE
     }
 
     // ============================================== Ponte do saldo (real-time)
@@ -376,6 +409,11 @@ class MainActivity : android.app.Activity() {
                 append("   W: ").append(wins).append("   L: ").append(losses)
                 append("\nstake ").append(money(st)).append(" · ").append(ck).append(" cliques")
                 if (detectedGame == GAME_MIMINES) append(" · ").append(mn).append(" minas")
+                if (galeOn) {
+                    append("\ngale ×").append(String.format(Locale.US, "%.2f", galeMult).replace(".", ","))
+                    append(" · passo ").append(json.optInt("galeStep", 0))
+                    append(if (galeUnlimited) " · ∞" else " / " + galeLimit)
+                }
             }
         }
         applyAutoUi()
@@ -467,11 +505,36 @@ class MainActivity : android.app.Activity() {
         }
         findViewById<TextView>(R.id.btnClicksMinus).setOnClickListener {
             clicksPerSession = (clicksPerSession - 1).coerceAtLeast(1)
-            refreshClicksLabel(); pushSettings()
+            gravarClicks(); refreshClicksLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnClicksPlus).setOnClickListener {
             clicksPerSession = (clicksPerSession + 1).coerceAtMost(10)
-            refreshClicksLabel(); pushSettings()
+            gravarClicks(); refreshClicksLabel(); pushSettings()
+        }
+
+        btnGale.setOnClickListener {
+            galeOn = !galeOn
+            refreshGaleUi(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnMultMinus).setOnClickListener {
+            galeMult = ((galeMult - 0.10).coerceAtLeast(1.10) * 100).roundToInt() / 100.0
+            refreshGaleUi(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnMultPlus).setOnClickListener {
+            galeMult = ((galeMult + 0.10).coerceAtMost(5.00) * 100).roundToInt() / 100.0
+            refreshGaleUi(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnLimitMinus).setOnClickListener {
+            galeLimit = (galeLimit - 1).coerceAtLeast(1)
+            refreshGaleUi(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnLimitPlus).setOnClickListener {
+            galeLimit = (galeLimit + 1).coerceAtMost(10)
+            refreshGaleUi(); pushSettings()
+        }
+        btnSemLimite.setOnClickListener {
+            galeUnlimited = !galeUnlimited
+            refreshGaleUi(); pushSettings()
         }
         findViewById<TextView>(R.id.btnMinesMinus).setOnClickListener {
             minesCount = (minesCount - 1).coerceAtLeast(1)
@@ -551,6 +614,28 @@ class MainActivity : android.app.Activity() {
         sendToGame("setAlvo", JSONObject().put("value", alvo))
         sendToGame("setRegra", JSONObject().put("value", avRegra))
         sendToGame("setNomes", JSONObject().put("value", avNomes))
+        sendToGame("setGale", JSONObject().put("on", galeOn))
+        sendToGame("setGaleMult", JSONObject().put("value", galeMult))
+        sendToGame("setGaleLimit", JSONObject().put("value", galeLimit))
+        sendToGame("setGaleUnlimited", JSONObject().put("value", galeUnlimited))
+    }
+
+    /** Guarda o nº de cliques no jogo certo (Archéo 3, Mi Mines 5 por padrão). */
+    private fun gravarClicks() {
+        when (detectedGame) {
+            GAME_MIMINES -> clicksMines = clicksPerSession
+            GAME_ARCHEO -> clicksArcheo = clicksPerSession
+        }
+    }
+
+    private fun refreshGaleUi() {
+        btnGale.text = getString(if (galeOn) R.string.gale_on else R.string.gale_off)
+        btnGale.setTextColor(getColor(if (galeOn) R.color.green else R.color.muted))
+        multValue.text = "×" + String.format(Locale.US, "%.2f", galeMult).replace(".", ",")
+        limitValue.text = if (galeLimit == 1) "1 gale" else "$galeLimit gales"
+        limitValue.alpha = if (galeUnlimited) 0.45f else 1f
+        btnSemLimite.text = getString(if (galeUnlimited) R.string.sem_limite_on else R.string.sem_limite_off)
+        btnSemLimite.setTextColor(getColor(if (galeUnlimited) R.color.gold else R.color.muted))
     }
 
     private fun refreshAlvoLabel() {
@@ -692,7 +777,9 @@ class MainActivity : android.app.Activity() {
             var AUTO = { running: false, stake: 1, clicks: 3, mines: 3,
                          sessions: 0, wins: 0, losses: 0, busy: false,
                          alvo: 2, regra: 'aposBaixa', nomes: 'anon',
-                         velas: 0, puladas: 0 };
+                         velas: 0, puladas: 0,
+                         galeOn: true, galeMult: 2, galeLimit: 3,
+                         galeUnlimited: false, galeStep: 0, stakeBase: 1 };
             var seen = {};
             var announced = null;
             var lastBal = null;
@@ -763,7 +850,8 @@ class MainActivity : android.app.Activity() {
               post({ type: 'auto', game: game(), running: AUTO.running, sessions: AUTO.sessions,
                      wins: AUTO.wins, losses: AUTO.losses, stake: AUTO.stake,
                      clicks: AUTO.clicks, mines: AUTO.mines, alvo: AUTO.alvo,
-                     regra: AUTO.regra, nomes: AUTO.nomes, velas: AUTO.velas });
+                     regra: AUTO.regra, nomes: AUTO.nomes, velas: AUTO.velas,
+                     galeStep: AUTO.galeStep, galeOn: AUTO.galeOn });
               try {
                 if (game() === 'mimines') {
                   var l = mmLadderValues();
@@ -876,16 +964,18 @@ class MainActivity : android.app.Activity() {
                 var res = await arcWaitPick(prev, 7000);
                 if (res && res.ok) { prev = res.idx; } else { alive = false; break; }
               }
+              var ganhou = false;
               if (alive && arcCashVal() > 0 && arcActive()) {
-                simClick(arcBtn(/CASHOUT/i)); AUTO.wins++;
+                simClick(arcBtn(/CASHOUT/i)); AUTO.wins++; ganhou = true;
                 await waitFor(function () { return !arcActive(); }, 6000);
               } else if (alive) {
-                AUTO.wins++;
+                AUTO.wins++; ganhou = true;
               } else {
                 AUTO.losses++;
                 await waitFor(function () { return !arcActive(); }, 4000);
               }
               AUTO.sessions++;
+              galePos(!ganhou);
               report();
             }
 
@@ -1035,14 +1125,43 @@ class MainActivity : android.app.Activity() {
                 if (res === 'alive') { await sleep(300); } else { alive = false; break; }
               }
 
+              var ganhou = false;
               if (alive && mmCashBtn()) {
                 mmCashBtn().click(); AUTO.wins++;
                 await waitFor(mmBetBtn, 8000);
+                ganhou = true;
               } else {
                 AUTO.losses++;
                 await waitFor(mmBetBtn, 4000);
               }
               AUTO.sessions++;
+              galePos(!ganhou);
+              report();
+            }
+
+            // ================================================= MARTINGALE
+            // Perdeu -> proxima aposta = stake base x multiplicador^passo.
+            // Ganhou -> volta ao stake base. Limite de passos configuravel;
+            // com "sem limite" ligado o limite e ignorado.
+            function galeReset() {
+              AUTO.galeStep = 0;
+              if (AUTO.stakeBase) { AUTO.stake = AUTO.stakeBase; }
+              report();
+            }
+            function galePos(perdeu) {
+              if (!AUTO.galeOn) { return; }
+              if (!AUTO.stakeBase) { AUTO.stakeBase = AUTO.stake; }
+              if (!perdeu) { galeReset(); return; }
+              AUTO.galeStep = (AUTO.galeStep || 0) + 1;
+              if (!AUTO.galeUnlimited && AUTO.galeStep > AUTO.galeLimit) {
+                AUTO.running = false;
+                AUTO.galeStep = 0;
+                AUTO.stake = AUTO.stakeBase;
+                post({ type: 'gale', evento: 'limite_atingido', limite: AUTO.galeLimit });
+                report();
+                return;
+              }
+              AUTO.stake = AUTO.stakeBase * Math.pow(AUTO.galeMult, AUTO.galeStep);
               report();
             }
 
@@ -1255,8 +1374,23 @@ class MainActivity : android.app.Activity() {
             function handleCmd(d) {
               if (!game()) { return false; }
               switch (d.cmd) {
+                case 'setGale':
+                  AUTO.galeOn = !!d.on;
+                  if (!AUTO.galeOn) { AUTO.galeStep = 0; AUTO.stake = AUTO.stakeBase || AUTO.stake; }
+                  report(); return true;
+                case 'setGaleMult':
+                  AUTO.galeMult = Math.min(5, Math.max(1.1, Number(d.value) || 2));
+                  report(); return true;
+                case 'setGaleLimit':
+                  AUTO.galeLimit = Math.min(10, Math.max(1, Number(d.value) || 3));
+                  report(); return true;
+                case 'setGaleUnlimited':
+                  AUTO.galeUnlimited = !!d.value;
+                  report(); return true;
                 case 'setStake':
                   AUTO.stake = Number(d.value) || 1;
+                  AUTO.stakeBase = AUTO.stake;
+                  AUTO.galeStep = 0;
                   if (game() === 'archeo') { arcSetStake(AUTO.stake); }
                   if (game() === 'mimines') { mmSetStake(AUTO.stake); }
                   if (game() === 'aviator') { avApplyConfig(); }

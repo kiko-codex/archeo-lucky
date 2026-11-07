@@ -342,6 +342,173 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- ===== MARTINGALE (Mi Mines / Archéo) ===== -->
+            <LinearLayout
+                android:id="@+id/rowGale"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:letterSpacing="0.1"
+                        android:text="@string/label_gale"
+                        android:textColor="@color/muted"
+                        android:textSize="9sp" />
+
+                    <TextView
+                        android:id="@+id/btnGale"
+                        android:layout_width="wrap_content"
+                        android:layout_height="22dp"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:minWidth="72dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:text="@string/gale_on"
+                        android:textColor="@color/green"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_mult"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnMultMinus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="\u2212"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/multValue"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="×2,00"
+                        android:textColor="#FFF2F2F5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/btnMultPlus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:letterSpacing="0.1"
+                        android:text="@string/label_limite"
+                        android:textColor="@color/muted"
+                        android:textSize="9sp" />
+
+                    <TextView
+                        android:id="@+id/btnSemLimite"
+                        android:layout_width="wrap_content"
+                        android:layout_height="22dp"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:minWidth="72dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:text="@string/sem_limite_off"
+                        android:textColor="@color/muted"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnLimitMinus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="\u2212"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/limitValue"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="3 gales"
+                        android:textColor="#FFF2F2F5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/btnLimitPlus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- ===== ALVO / AUTO-CASHOUT (Aviator) ===== -->
             <LinearLayout
                 android:id="@+id/rowAlvo"

@@ -25,4 +25,11 @@
     <string name="regra_sempre">SEMPRE (TODAS AS VELAS)</string>
     <string name="nomes_anon">ANÔNIMOS (d***4)</string>
     <string name="nomes_apelido">APELIDOS (Jogador 1…10)</string>
+    <string name="label_gale">MARTINGALE (APÓS PERDA)</string>
+    <string name="label_mult">MULTIPLICADOR DO GALE</string>
+    <string name="label_limite">LIMITE DE GALES</string>
+    <string name="gale_on">ATIVADO</string>
+    <string name="gale_off">DESATIVADO</string>
+    <string name="sem_limite_off">∞ SEM LIMITE: NÃO</string>
+    <string name="sem_limite_on">∞ SEM LIMITE: SIM</string>
 </resources>
