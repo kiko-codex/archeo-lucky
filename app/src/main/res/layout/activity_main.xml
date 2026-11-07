@@ -218,114 +218,251 @@
             </LinearLayout>
 
 
-            <!-- Minas por rodada (Mi Mines) -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:letterSpacing="0.1"
-                android:text="@string/label_mines"
-                android:textColor="@color/muted"
-                android:textSize="9sp" />
-
+            <!-- ===== MINAS (Mi Mines) ===== -->
             <LinearLayout
+                android:id="@+id/rowMines"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/btnMinesMinus"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/stepper_button"
-                    android:fontFamily="sans-serif-black"
-                    android:gravity="center"
-                    android:text="−"
-                    android:textColor="@color/gold"
-                    android:textSize="18sp" />
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_mines"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
 
-                <TextView
-                    android:id="@+id/minesValue"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/field_background"
-                    android:fontFamily="sans-serif-black"
-                    android:gravity="center"
-                    android:text="3 minas"
-                    android:textColor="#FFF2F2F5"
-                    android:textSize="15sp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/btnMinesPlus"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/stepper_button"
-                    android:fontFamily="sans-serif-black"
-                    android:gravity="center"
-                    android:text="+"
-                    android:textColor="@color/gold"
-                    android:textSize="18sp" />
+                    <TextView
+                        android:id="@+id/btnMinesMinus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
 
+                    <TextView
+                        android:id="@+id/minesValue"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="3 minas"
+                        android:textColor="#FFF2F2F5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/btnMinesPlus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Cliques por sessão -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:letterSpacing="0.1"
-                android:text="@string/label_clicks"
-                android:textColor="@color/muted"
-                android:textSize="9sp" />
-
+            <!-- ===== CLIQUES POR SESSÃO (Archéo / Mi Mines) ===== -->
             <LinearLayout
+                android:id="@+id/rowClicks"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/btnClicksMinus"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/stepper_button"
-                    android:fontFamily="sans-serif-black"
-                    android:gravity="center"
-                    android:text="−"
-                    android:textColor="@color/gold"
-                    android:textSize="18sp" />
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_clicks"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnClicksMinus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/clicksValue"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="3 cliques"
+                        android:textColor="#FFF2F2F5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/btnClicksPlus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== ALVO / AUTO-CASHOUT (Aviator) ===== -->
+            <LinearLayout
+                android:id="@+id/rowAlvo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/clicksValue"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_alvo"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnAlvoMinus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/alvoValue"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_background"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="2,00x"
+                        android:textColor="#FFF2F2F5"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/btnAlvoPlus"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="@drawable/stepper_button"
+                        android:fontFamily="sans-serif-black"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/gold"
+                        android:textSize="18sp" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== REGRA DE ENTRADA (Aviator) ===== -->
+            <LinearLayout
+                android:id="@+id/rowRegra"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_regra"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+
+                <TextView
+                    android:id="@+id/btnRegra"
+                    android:layout_width="match_parent"
                     android:layout_height="36dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
+                    android:layout_marginTop="5dp"
                     android:background="@drawable/field_background"
                     android:fontFamily="sans-serif-black"
                     android:gravity="center"
-                    android:text="3 cliques"
+                    android:text="@string/regra_apos_baixa"
                     android:textColor="#FFF2F2F5"
-                    android:textSize="15sp" />
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- ===== NOMES (Aviator) ===== -->
+            <LinearLayout
+                android:id="@+id/rowNomes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/btnClicksPlus"
-                    android:layout_width="36dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:letterSpacing="0.1"
+                    android:text="@string/label_nomes"
+                    android:textColor="@color/muted"
+                    android:textSize="9sp" />
+
+                <TextView
+                    android:id="@+id/btnNomes"
+                    android:layout_width="match_parent"
                     android:layout_height="36dp"
-                    android:background="@drawable/stepper_button"
+                    android:layout_marginTop="5dp"
+                    android:background="@drawable/field_background"
                     android:fontFamily="sans-serif-black"
                     android:gravity="center"
-                    android:text="+"
-                    android:textColor="@color/gold"
-                    android:textSize="18sp" />
-
+                    android:text="@string/nomes_anon"
+                    android:textColor="#FFF2F2F5"
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <!-- Status do automático -->

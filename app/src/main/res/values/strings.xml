@@ -17,4 +17,12 @@
     <string name="auto_stop">■  PARAR OPERAÇÃO</string>
     <string name="auto_idle">Automático parado.\nAbra o Archéo ou o Mi Mines e toque em operação automática.</string>
     <string name="auto_no_game">Abra um jogo primeiro 😉</string>
+    <string name="aviator_toast">Aviator Carregado ✅✅</string>
+    <string name="label_alvo">ALVO / AUTO-CASHOUT</string>
+    <string name="label_regra">REGRA DE ENTRADA</string>
+    <string name="label_nomes">NOMES DOS JOGADORES</string>
+    <string name="regra_apos_baixa">APÓS VELA BAIXA (&lt; alvo)</string>
+    <string name="regra_sempre">SEMPRE (TODAS AS VELAS)</string>
+    <string name="nomes_anon">ANÔNIMOS (d***4)</string>
+    <string name="nomes_apelido">APELIDOS (Jogador 1…10)</string>
 </resources>

@@ -62,6 +62,15 @@ class MainActivity : android.app.Activity() {
     private lateinit var autoStatus: TextView
     private lateinit var btnAuto: TextView
 
+    private lateinit var rowClicks: View
+    private lateinit var rowMines: View
+    private lateinit var rowAlvo: View
+    private lateinit var rowRegra: View
+    private lateinit var rowNomes: View
+    private lateinit var alvoValue: TextView
+    private lateinit var btnRegra: TextView
+    private lateinit var btnNomes: TextView
+
     private val ui = Handler(Looper.getMainLooper())
     private var lastToastGame: String? = null
     private var detectedGame: String? = null
@@ -74,6 +83,12 @@ class MainActivity : android.app.Activity() {
     private var minesLadder: List<Double> = emptyList()
     private var autoRunning = false
     private var panelMinimized = false
+
+    // Aviator
+    private var alvo = 2.00
+    private var avRegra = "aposBaixa"          // aposBaixa | sempre
+    private var avNomes = "anon"               // anon | apelido
+    private var stakeAviator = 100.0
 
     private val startUrl = "https://www.google.com/"
 
@@ -98,6 +113,15 @@ class MainActivity : android.app.Activity() {
         autoStatus = findViewById(R.id.autoStatus)
         btnAuto = findViewById(R.id.btnAuto)
 
+        rowClicks = findViewById(R.id.rowClicks)
+        rowMines = findViewById(R.id.rowMines)
+        rowAlvo = findViewById(R.id.rowAlvo)
+        rowRegra = findViewById(R.id.rowRegra)
+        rowNomes = findViewById(R.id.rowNomes)
+        alvoValue = findViewById(R.id.alvoValue)
+        btnRegra = findViewById(R.id.btnRegra)
+        btnNomes = findViewById(R.id.btnNomes)
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setupWebView()
@@ -107,6 +131,10 @@ class MainActivity : android.app.Activity() {
         refreshStakeLabel()
         refreshClicksLabel()
         refreshMinesLabel()
+        refreshAlvoLabel()
+        refreshRegraLabel()
+        refreshNomesLabel()
+        updatePanelVisibility()
 
         val deepLink = intent?.dataString
         webView.loadUrl(if (!deepLink.isNullOrBlank()) deepLink else startUrl)
@@ -172,6 +200,7 @@ class MainActivity : android.app.Activity() {
         if (url.isNullOrBlank()) return null
         val u = url.lowercase(Locale.ROOT)
         return when {
+            u.contains("aviator") && (u.contains("pridebet") || u.contains("spribegaming")) -> GAME_AVIATOR
             u.contains("mines-6") -> GAME_MIMINES
             u.contains("spribegaming") && u.contains("mines") -> GAME_MIMINES
             u.contains("archeo") && (u.contains("pridebet") || u.contains("splitthepot") ||
@@ -184,18 +213,48 @@ class MainActivity : android.app.Activity() {
         val changed = detectedGame != game
         detectedGame = game
         if (changed) {
-            autoStatus.text = getString(
-                if (game == GAME_MIMINES) R.string.mines_toast else R.string.game_toast
-            )
+            if (game == GAME_AVIATOR) {
+                // padrao da operacao: stake 100, saida 2,00x
+                stake = stakeAviator
+                alvo = 2.00
+                avRegra = "aposBaixa"
+                refreshAlvoLabel(); refreshRegraLabel(); refreshNomesLabel()
+            }
+            autoStatus.text = getString(resToastOf(game))
+            updatePanelVisibility()
         }
-        if (lastToastGame == game) return
+        if (lastToastGame == game) {
+            refreshStakeLabel()
+            return
+        }
         lastToastGame = game
-        val res = if (game == GAME_MIMINES) R.string.mines_toast else R.string.game_toast
-        Toast.makeText(this, res, Toast.LENGTH_LONG).show()
+        Toast.makeText(this, resToastOf(game), Toast.LENGTH_LONG).show()
         refreshStakeLabel()
         liveStatus.text = getString(R.string.status_live)
         liveStatus.setTextColor(getColor(R.color.green))
-        statusLine.text = if (game == GAME_MIMINES) "Mi Mines · lendo saldo…" else "Archéo · lendo saldo…"
+        statusLine.text = when (game) {
+            GAME_MIMINES -> "Mi Mines · lendo saldo…"
+            GAME_AVIATOR -> "Aviator · auto-aposta · lendo saldo…"
+            else -> "Archéo · lendo saldo…"
+        }
+        if (game == GAME_AVIATOR) pushSettings()
+    }
+
+    private fun resToastOf(game: String): Int = when (game) {
+        GAME_MIMINES -> R.string.mines_toast
+        GAME_AVIATOR -> R.string.aviator_toast
+        else -> R.string.game_toast
+    }
+
+    /** Mostra só os controles que fazem sentido para o jogo aberto. */
+    private fun updatePanelVisibility() {
+        val av = detectedGame == GAME_AVIATOR
+        val mm = detectedGame == GAME_MIMINES
+        rowAlvo.visibility = if (av) View.VISIBLE else View.GONE
+        rowRegra.visibility = if (av) View.VISIBLE else View.GONE
+        rowNomes.visibility = if (av) View.VISIBLE else View.GONE
+        rowMines.visibility = if (mm) View.VISIBLE else View.GONE
+        rowClicks.visibility = if (av) View.GONE else View.VISIBLE
     }
 
     // ============================================== Ponte do saldo (real-time)
@@ -228,7 +287,7 @@ class MainActivity : android.app.Activity() {
             when (json.optString("type")) {
                 "hello" -> {
                     val g = json.optString("game")
-                    if (g == GAME_MIMINES || g == GAME_ARCHEO) {
+                    if (g == GAME_MIMINES || g == GAME_ARCHEO || g == GAME_AVIATOR) {
                         notifyGameOpened(g)
                         // o board acabou de ficar pronto: reenvia as configurações
                         // (antes disso o frame do jogo ainda não existia e o comando era descartado)
@@ -264,28 +323,60 @@ class MainActivity : android.app.Activity() {
 
     private fun handleAutoReport(json: JSONObject) {
         val g = json.optString("game")
-        if (g == GAME_MIMINES || g == GAME_ARCHEO) detectedGame = g
+        if (g == GAME_MIMINES || g == GAME_ARCHEO || g == GAME_AVIATOR) detectedGame = g
         autoRunning = json.optBoolean("running", autoRunning)
         val sessions = json.optInt("sessions", 0)
         val wins = json.optInt("wins", 0)
         val losses = json.optInt("losses", 0)
+        val velas = json.optInt("velas", 0)
         val st = json.optDouble("stake", stake)
         if (detectedGame == GAME_MIMINES && !st.isNaN() && kotlin.math.abs(st - stake) > 0.004) {
             stake = st
             refreshStakeLabel()
         }
+        if (detectedGame == GAME_AVIATOR) {
+            if (!st.isNaN() && st > 0) stakeAviator = st
+            val al = json.optDouble("alvo", alvo)
+            if (!al.isNaN() && kotlin.math.abs(al - alvo) > 0.004) {
+                alvo = al
+                refreshAlvoLabel()
+            }
+            val rg = json.optString("regra", "")
+            if (rg.isNotEmpty() && rg != avRegra) {
+                avRegra = rg
+                refreshRegraLabel()
+            }
+            val nm = json.optString("nomes", "")
+            if (nm.isNotEmpty() && nm != avNomes) {
+                avNomes = nm
+                refreshNomesLabel()
+            }
+        }
         val ck = json.optInt("clicks", clicksPerSession)
         val mn = json.optInt("mines", minesCount)
-        val game = if (detectedGame == GAME_MIMINES) "Mi Mines" else "Archéo"
+        val game = when (detectedGame) {
+            GAME_MIMINES -> "Mi Mines"
+            GAME_AVIATOR -> "Aviator"
+            else -> "Archéo"
+        }
 
         panelSummary.text = "W$wins · L$losses"
         autoStatus.text = buildString {
             append(if (autoRunning) "● rodando" else "○ parado")
             append("  ·  ").append(game)
-            append("\nsessões: ").append(sessions)
-            append("   W: ").append(wins).append("   L: ").append(losses)
-            append("\nstake ").append(money(st)).append(" · ").append(ck).append(" cliques")
-            if (detectedGame == GAME_MIMINES) append(" · ").append(mn).append(" minas")
+            if (detectedGame == GAME_AVIATOR) {
+                append("\nvelas: ").append(velas)
+                append("   apostas: ").append(sessions)
+                append("   W: ").append(wins).append("   L: ").append(losses)
+                append("\nstake ").append(money(stake))
+                append(" · alvo ").append(String.format(Locale.US, "%.2f", alvo).replace(".", ",")).append("x")
+                append(" · ").append(if (avRegra == "sempre") "sempre" else "após baixa")
+            } else {
+                append("\nsessões: ").append(sessions)
+                append("   W: ").append(wins).append("   L: ").append(losses)
+                append("\nstake ").append(money(st)).append(" · ").append(ck).append(" cliques")
+                if (detectedGame == GAME_MIMINES) append(" · ").append(mn).append(" minas")
+            }
         }
         applyAutoUi()
     }
@@ -357,13 +448,21 @@ class MainActivity : android.app.Activity() {
         panelHeader.setOnTouchListener(DragListener())
 
         findViewById<TextView>(R.id.btnStakeMinus).setOnClickListener {
-            stake = if (usaEscada()) stepLadder(-1)
-            else ((stake - 0.5).coerceAtLeast(0.5) * 100).roundToInt() / 100.0
+            stake = when {
+                usaEscada() -> stepLadder(-1)
+                detectedGame == GAME_AVIATOR -> (stake - 10.0).coerceAtLeast(10.0)
+                else -> ((stake - 0.5).coerceAtLeast(0.5) * 100).roundToInt() / 100.0
+            }
+            if (detectedGame == GAME_AVIATOR) stakeAviator = stake
             refreshStakeLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnStakePlus).setOnClickListener {
-            stake = if (usaEscada()) stepLadder(1)
-            else ((stake + 0.5).coerceAtMost(100.0) * 100).roundToInt() / 100.0
+            stake = when {
+                usaEscada() -> stepLadder(1)
+                detectedGame == GAME_AVIATOR -> (stake + 10.0).coerceAtMost(10000.0)
+                else -> ((stake + 0.5).coerceAtMost(100.0) * 100).roundToInt() / 100.0
+            }
+            if (detectedGame == GAME_AVIATOR) stakeAviator = stake
             refreshStakeLabel(); pushSettings()
         }
         findViewById<TextView>(R.id.btnClicksMinus).setOnClickListener {
@@ -381,6 +480,23 @@ class MainActivity : android.app.Activity() {
         findViewById<TextView>(R.id.btnMinesPlus).setOnClickListener {
             minesCount = (minesCount + 1).coerceAtMost(20)
             refreshMinesLabel(); pushSettings()
+        }
+
+        findViewById<TextView>(R.id.btnAlvoMinus).setOnClickListener {
+            alvo = (((alvo - 0.1).coerceAtLeast(1.05)) * 100).roundToInt() / 100.0
+            refreshAlvoLabel(); pushSettings()
+        }
+        findViewById<TextView>(R.id.btnAlvoPlus).setOnClickListener {
+            alvo = (((alvo + 0.1).coerceAtMost(50.0)) * 100).roundToInt() / 100.0
+            refreshAlvoLabel(); pushSettings()
+        }
+        btnRegra.setOnClickListener {
+            avRegra = if (avRegra == "aposBaixa") "sempre" else "aposBaixa"
+            refreshRegraLabel(); pushSettings()
+        }
+        btnNomes.setOnClickListener {
+            avNomes = if (avNomes == "anon") "apelido" else "anon"
+            refreshNomesLabel(); pushSettings()
         }
 
         btnAuto.setOnClickListener { toggleAuto() }
@@ -432,10 +548,30 @@ class MainActivity : android.app.Activity() {
         sendToGame("setStake", JSONObject().put("value", stake))
         sendToGame("setClicks", JSONObject().put("value", clicksPerSession))
         sendToGame("setMines", JSONObject().put("value", minesCount))
+        sendToGame("setAlvo", JSONObject().put("value", alvo))
+        sendToGame("setRegra", JSONObject().put("value", avRegra))
+        sendToGame("setNomes", JSONObject().put("value", avNomes))
+    }
+
+    private fun refreshAlvoLabel() {
+        alvoValue.text = String.format(Locale.US, "%.2f", alvo).replace(".", ",") + "x"
+    }
+
+    private fun refreshRegraLabel() {
+        btnRegra.text = getString(
+            if (avRegra == "sempre") R.string.regra_sempre else R.string.regra_apos_baixa
+        )
+    }
+
+    private fun refreshNomesLabel() {
+        btnNomes.text = getString(
+            if (avNomes == "apelido") R.string.nomes_apelido else R.string.nomes_anon
+        )
     }
 
     private fun refreshStakeLabel() {
-        stakeValue.text = if (detectedGame == GAME_MIMINES) "${money(stake)} MZN" else "${money(stake)} FUN"
+        stakeValue.text = if (detectedGame == GAME_MIMINES || detectedGame == GAME_AVIATOR)
+            "${money(stake)} MZN" else "${money(stake)} FUN"
     }
 
     private fun refreshClicksLabel() {
@@ -544,6 +680,7 @@ class MainActivity : android.app.Activity() {
         private const val BRIDGE_NAME = "ArcheoBridge"
         private const val GAME_ARCHEO = "archeo"
         private const val GAME_MIMINES = "mimines"
+        private const val GAME_AVIATOR = "aviator"
 
         private val WATCHER_JS = """
         (function () {
@@ -553,7 +690,9 @@ class MainActivity : android.app.Activity() {
 
             var BRIDGE = 'ArcheoBridge';
             var AUTO = { running: false, stake: 1, clicks: 3, mines: 3,
-                         sessions: 0, wins: 0, losses: 0, busy: false };
+                         sessions: 0, wins: 0, losses: 0, busy: false,
+                         alvo: 2, regra: 'aposBaixa', nomes: 'anon',
+                         velas: 0, puladas: 0 };
             var seen = {};
             var announced = null;
             var lastBal = null;
@@ -596,6 +735,7 @@ class MainActivity : android.app.Activity() {
             function game() {
               if (archeoBoard()) { return 'archeo'; }
               if (minesBoard()) { return 'mimines'; }
+              if (avReady()) { return 'aviator'; }
               return null;
             }
 
@@ -622,7 +762,8 @@ class MainActivity : android.app.Activity() {
             function report() {
               post({ type: 'auto', game: game(), running: AUTO.running, sessions: AUTO.sessions,
                      wins: AUTO.wins, losses: AUTO.losses, stake: AUTO.stake,
-                     clicks: AUTO.clicks, mines: AUTO.mines });
+                     clicks: AUTO.clicks, mines: AUTO.mines, alvo: AUTO.alvo,
+                     regra: AUTO.regra, nomes: AUTO.nomes, velas: AUTO.velas });
               try {
                 if (game() === 'mimines') {
                   var l = mmLadderValues();
@@ -905,11 +1046,200 @@ class MainActivity : android.app.Activity() {
               report();
             }
 
+            // ================================================= AVIATOR (Spribe / Angular)
+            // A rodada e do servidor: nao se "inicia". O bot aposta na janela
+            // seguinte lendo a vela que acabou de fechar na fita de payouts.
+
+            function avReady() {
+              return document.querySelector('.payouts-block') && document.querySelector('app-bet-control');
+            }
+            function avHist() {
+              var pp = document.querySelectorAll('.payouts-block .payout');
+              var arr = [];
+              for (var i = 0; i < pp.length; i++) {
+                var r = pp[i].getBoundingClientRect();
+                if (r.width > 0) { arr.push({ s: (pp[i].innerText || '').trim(), x: r.x }); }
+              }
+              arr.sort(function (a, b) { return a.x - b.x; });
+              var out = [];
+              for (var j = 0; j < arr.length; j++) { out.push(arr[j].s); }
+              return out;            // out[0] = vela mais recente
+            }
+            function avNewest() { var h = avHist(); return h.length ? h[0] : null; }
+            function avNum(s) {
+              var m = String(s || '').match(/([0-9]+(?:[.,][0-9]+)?)/);
+              return m ? parseFloat(m[1].replace(',', '.')) : null;
+            }
+            function avCtrl() { return document.querySelectorAll('app-bet-control')[0]; }
+            function avBetBtn() {
+              var c = avCtrl();
+              if (!c) { return null; }
+              var b = c.querySelector('button.btn-success.bet') || c.querySelector('button.bet');
+              if (!b) { return null; }
+              if (!/^bet/i.test((b.innerText || '').replace(/\s+/g, ' ').trim())) { return null; }
+              return b;
+            }
+            function avBusyBtn() {
+              var c = avCtrl();
+              if (!c) { return null; }
+              var bs = c.querySelectorAll('button');
+              for (var i = 0; i < bs.length; i++) {
+                var t = (bs[i].innerText || '').replace(/\s+/g, ' ').trim();
+                if (/cancel|waiting|cash\s*out/i.test(t)) { return bs[i]; }
+              }
+              return null;
+            }
+            function avBalance() {
+              try {
+                var cs = document.querySelectorAll('[class*="balance"]');
+                for (var i = 0; i < cs.length; i++) {
+                  var t = (cs[i].innerText || '').replace(/\s+/g, ' ');
+                  var m = t.match(/([0-9][0-9,]*\.[0-9]{2})/);
+                  if (m) { return { v: m[1], cur: 'MZN' }; }
+                }
+                var els = document.querySelectorAll('*');
+                for (var j = 0; j < els.length; j++) {
+                  var e = els[j];
+                  if (e.children.length) { continue; }
+                  var r = e.getBoundingClientRect();
+                  if (r.top > 130 || r.width <= 0) { continue; }
+                  var sv = (e.innerText || '').trim();
+                  if (/^[0-9][0-9,]*\.[0-9]{2}$/.test(sv)) { return { v: sv, cur: 'MZN' }; }
+                }
+              } catch (e) {}
+              return null;
+            }
+            function avSetVal(el, v) {
+              if (!el) { return false; }
+              try {
+                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                setter.call(el, v);
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                el.dispatchEvent(new Event('blur', { bubbles: true }));
+                return true;
+              } catch (e) { return false; }
+            }
+            async function avApplyConfig() {
+              try {
+                var c = avCtrl();
+                if (!c) { return null; }
+                var tabs = all('button.tab');
+                for (var i = 0; i < tabs.length; i++) {
+                  if (/^auto$/i.test((tabs[i].innerText || '').trim())) {
+                    if (!/(^|\s)active(\s|$)/.test(tabs[i].className || '')) { tabs[i].click(); }
+                    break;
+                  }
+                }
+                await sleep(450);
+                var sw = c.querySelector('.cash-out-switcher .input-switch');
+                if (sw && /(^|\s)off(\s|$)/.test(sw.className || '')) { sw.click(); await sleep(350); }
+                var ins = [], raw = c.querySelectorAll('input');
+                for (var k = 0; k < raw.length; k++) {
+                  if (raw[k].getBoundingClientRect().width > 0) { ins.push(raw[k]); }
+                }
+                if (ins[0]) { avSetVal(ins[0], Number(AUTO.stake).toFixed(2)); }
+                if (ins[1]) { avSetVal(ins[1], Number(AUTO.alvo).toFixed(2)); }
+                await sleep(350);
+                var v0 = ins[0] ? parseFloat(String(ins[0].value).replace(',', '.')) : null;
+                var v1 = ins[1] ? parseFloat(String(ins[1].value).replace(',', '.')) : null;
+                var ligado = sw ? !/(^|\s)off(\s|$)/.test(sw.className || '') : false;
+                return { stake: v0, alvo: v1, autoCashout: ligado };
+              } catch (e) { return null; }
+            }
+            function avDecide(m) {
+              if (AUTO.regra === 'sempre') { return true; }
+              return (m !== null && !isNaN(m) && m < Number(AUTO.alvo));
+            }
+            async function avSession() {
+              if (!AUTO.running) { return; }
+              var cfg = await avApplyConfig();
+              if (cfg && cfg.stake !== null && !isNaN(cfg.stake) && Math.abs(cfg.stake - AUTO.stake) > 0.005) {
+                AUTO.stake = cfg.stake;
+              }
+              report();
+              var ultima = avNewest();
+              var quero = false, apostou = false, emJogo = false;
+              while (AUTO.running) {
+                var cur = avNewest();
+                if (cur && cur !== ultima) {
+                  var m = avNum(cur);
+                  if (emJogo) {
+                    if (m !== null && m >= Number(AUTO.alvo)) { AUTO.wins++; } else { AUTO.losses++; }
+                    AUTO.sessions++;
+                    emJogo = false;
+                    report();
+                  }
+                  AUTO.velas++;
+                  ultima = cur;
+                  quero = avDecide(m);
+                  apostou = false;
+                  if (!quero) { AUTO.puladas++; }
+                  report();
+                }
+                if (quero && !apostou && AUTO.running) {
+                  var b = avBetBtn();
+                  if (b) {
+                    try { b.click(); } catch (e) {}
+                    var entrou = await waitFor(function () {
+                      return (avBetBtn() === null || avBusyBtn() !== null) ? true : null;
+                    }, 2500, 120);
+                    if (entrou) { apostou = true; emJogo = true; }
+                    else { quero = false; }   // perdeu a janela: nao insiste (evita clique duplo)
+                  }
+                }
+                await sleep(260);
+              }
+            }
+            // Apelidos locais. O servidor manda o nome JA mascarado (d***4):
+            // o nome real nunca chega ao aparelho. Aqui so trocamos o TEXTO
+            // visivel por um rotulo estavel, para dar pra acompanhar o jogador.
+            // O Angular reescreve o texto a cada atualizacao, entao usamos
+            // MutationObserver + varredura periodica de reforco.
+            var avNmOn = false, avNmObs = null, avNmLast = 0;
+            function avNmFix(node) {
+              try {
+                var t = node.nodeValue || '';
+                var m = t.trim().match(/^([A-Za-z])\*{2,}([0-9])$/);
+                if (!m) { return; }
+                node.nodeValue = 'Jogador ' + (parseInt(m[2], 10) + 1);
+              } catch (e) {}
+            }
+            function avNmScan() {
+              try {
+                if (!document.body) { return; }
+                var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false), n;
+                while ((n = w.nextNode())) { avNmFix(n); }
+              } catch (e) {}
+            }
+            function avNames() {
+              if (AUTO.nomes !== 'apelido') { return; }
+              if (!avNmOn) {
+                avNmOn = true;
+                try {
+                  avNmObs = new MutationObserver(function (muts) {
+                    for (var i = 0; i < muts.length; i++) {
+                      var mu = muts[i];
+                      if (mu.type === 'characterData') { avNmFix(mu.target); }
+                      else if (mu.addedNodes) {
+                        for (var j = 0; j < mu.addedNodes.length; j++) {
+                          if (mu.addedNodes[j].nodeType === 3) { avNmFix(mu.addedNodes[j]); }
+                        }
+                      }
+                    }
+                  });
+                  avNmObs.observe(document.body, { subtree: true, childList: true, characterData: true });
+                } catch (e) {}
+              }
+              if (Date.now() - avNmLast > 900) { avNmLast = Date.now(); avNmScan(); }
+            }
+
             // ================================================= ciclo
             async function runSession() {
               var g = game();
               if (g === 'mimines') { return mmSession(); }
               if (g === 'archeo') { return arcSession(); }
+              if (g === 'aviator') { return avSession(); }
             }
             async function loop() {
               if (AUTO.busy) { return; }
@@ -929,6 +1259,17 @@ class MainActivity : android.app.Activity() {
                   AUTO.stake = Number(d.value) || 1;
                   if (game() === 'archeo') { arcSetStake(AUTO.stake); }
                   if (game() === 'mimines') { mmSetStake(AUTO.stake); }
+                  if (game() === 'aviator') { avApplyConfig(); }
+                  report(); return true;
+                case 'setAlvo':
+                  AUTO.alvo = Math.min(50, Math.max(1.05, Number(d.value) || 2));
+                  if (game() === 'aviator') { avApplyConfig(); }
+                  report(); return true;
+                case 'setRegra':
+                  AUTO.regra = (String(d.value) === 'sempre') ? 'sempre' : 'aposBaixa';
+                  report(); return true;
+                case 'setNomes':
+                  AUTO.nomes = (String(d.value) === 'apelido') ? 'apelido' : 'anon';
                   report(); return true;
                 case 'setClicks':
                   AUTO.clicks = Math.min(24, Math.max(1, Number(d.value) || 3));
@@ -971,7 +1312,8 @@ class MainActivity : android.app.Activity() {
                   post({ type: 'hello', game: g, url: String(location.href || '') });
                 }
                 if (!g) { return; }
-                var b = (g === 'mimines') ? minesBalance() : archeoBalance();
+                if (g === 'aviator') { avNames(); }
+                var b = (g === 'mimines') ? minesBalance() : (g === 'aviator' ? avBalance() : archeoBalance());
                 if (b && b.v !== lastBal) {
                   lastBal = b.v;
                   post({ type: 'saldo', value: b.v, currency: b.cur });
