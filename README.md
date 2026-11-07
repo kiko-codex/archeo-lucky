@@ -11,6 +11,34 @@ O APK é compilado **automaticamente no GitHub Actions** a cada push — sem And
 
 ---
 
+## v1.5 — Martingale (Mi Mines e Archéo)
+
+### Mi Mines
+Após uma **perda** entra com **3 minas e 5 cliques** (padrão fixado) e o stake vira
+`base × multiplicador^passo`.
+
+Exemplo, base **48** e ×2: `48 → 96 → 192`. Seu exemplo "perdeu 40 → 48" é o mesmo
+raciocínio: os 40 são o valor *perdido*, e o gale de 48 já cobre a perda com margem
+(payout de 5 cliques/3 minas ≈ 1,96x).
+
+### Archéo
+Após uma perda entra com **3 cliques** (padrão fixado) e o stake também é dobrado
+(`saldo perdido × 2`).
+
+### Controles do painel (aparecem nos dois jogos)
+| Controle | Faixa | Padrão |
+|---|---|---|
+| **MARTINGALE** (ativado/desativado) | on/off | ATIVADO |
+| **MULTIPLICADOR DO GALE** | ×1,10 a ×5,00 | ×2,00 |
+| **LIMITE DE GALES** | 1 a 10 | 3 |
+| **∞ SEM LIMITE** (ignora o limite) | sim/não | NÃO |
+
+Ao **ganhar**, o stake volta ao valor base e o passo zera. Ao **estourar o limite**,
+a operação **para sozinha** e o stake volta ao base.
+
+O martingale roda dentro do motor JS, não no app: quem sabe o resultado da rodada é o
+frame do jogo, então o stake da próxima aposta já sai calculado, sem corrida de tempo.
+
 ## v1.4 — Aviator com aposta automática
 
 O painel **G** agora se adapta ao jogo aberto.
