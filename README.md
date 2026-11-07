@@ -11,6 +11,35 @@ O APK é compilado **automaticamente no GitHub Actions** a cada push — sem And
 
 ---
 
+## v1.4 — Aviator com aposta automática
+
+O painel **G** agora se adapta ao jogo aberto.
+
+### Aviator (`pridebet.co.mz/games/Aviator-10`)
+
+| Controle | O que faz |
+|---|---|
+| **STAKE** | valor da aposta (passo de 10 MZN). Padrão ao abrir: **100,00** |
+| **ALVO / AUTO-CASHOUT** | saída automática, padrão **2,00x** (passo de 0,10) |
+| **REGRA DE ENTRADA** | `APÓS VELA BAIXA` (aposta só na vela seguinte a um resultado abaixo do alvo) ou `SEMPRE` |
+| **NOMES DOS JOGADORES** | `ANÔNIMOS (d***4)` ou `APELIDOS (Jogador 1…10)` |
+
+Como funciona: o motor lê a fita de payouts (`.payouts-block .payout`) dentro do frame
+da Spribe, aplica a regra sobre a **última vela fechada** e, se for o caso, clica em
+**Bet** na janela de apostas seguinte. O cash-out é feito pelo próprio jogo (switch
+Auto ligado + alvo gravado). O saldo sobe para o HUD em tempo real.
+
+Limites conhecidos:
+- se o clique em Bet não entrar em até 2,5 s, a rodada é **pulada** de propósito (evita clique duplo que cancelaria a aposta);
+- mudar stake/alvo no meio do voo reaplica a configuração e pode perder a janela daquela rodada;
+- o motor **não** prevê nada: a regra é mecânica. Em 169 velas medidas, as rodadas se mostraram independentes (χ² = 0,89 contra 3,84 crítico).
+
+### Nomes dos jogadores
+O servidor da Spribe entrega o nome **já mascarado** (`d***0` … `d***9` — no demo são
+10 bots). O nome real não existe no aparelho, então não há como "desanonimizar".
+O que o app faz é trocar **o texto na tela** por um rótulo estável (`Jogador 1`…`Jogador 10`)
+via MutationObserver — é apelido local, cosmético, não é o nome verdadeiro.
+
 ## 📲 Baixar o APK
 
 1. Vá na aba **Actions** deste repositório;
